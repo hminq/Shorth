@@ -2,7 +2,7 @@ using Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace Infrastucture.Persistence.Configurations;
+namespace Infrastucture.Database.Configurations;
 
 public sealed class LinkConfiguration : IEntityTypeConfiguration<Link>
 {
