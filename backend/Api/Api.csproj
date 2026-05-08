@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>1a4d1f6c-9f9a-48e1-b568-44fea91a46af</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <Folder Include="Controllers/" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Application\Application.csproj" />
+    <ProjectReference Include="..\Infrastucture\Infrastucture.csproj" />
+  </ItemGroup>
+</Project>
