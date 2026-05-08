@@ -1,0 +1,53 @@
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Api/Dockerfile
+    container_name: shorth-api
+    env_file:
+      - ./backend/.env
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+    ports:
+      - "5050:8080"
+    depends_on:
+      - shorth-postgres-db
+      - shorth-redis
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Worker/Dockerfile
+    container_name: shorth-worker
+    env_file:
+      - ./backend/.env
+    environment:
+      DOTNET_ENVIRONMENT: Development
+    depends_on:
+      - shorth-postgres-db
+      - shorth-redis
+
+  shorth-postgres-db:
+    image: postgres:17-alpine
+    container_name: shorth-postgres-db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: MothaibaM1*
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  shorth-redis:
+    image: redis:trixie
+    container_name: shorth-redis
+    command: ["redis-server", "--requirepass", "MothaibaM1*"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
