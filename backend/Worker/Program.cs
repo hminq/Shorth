@@ -1,7 +1,9 @@
-using Worker;
+using Infrastucture;
 
 var builder = Host.CreateApplicationBuilder(args);
-builder.Services.AddHostedService<Worker>();
+
+builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddHostedService<global::Worker.Worker>();
 
 var host = builder.Build();
 host.Run();
