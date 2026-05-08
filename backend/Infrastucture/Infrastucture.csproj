@@ -1,18 +1,18 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
-
   <ItemGroup>
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
-    <PackageReference Include="BCrypt.Net-Next" Version="5.0.0-prerelease.gf86f9271e6" />
-    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.0" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0"/>
+    <PackageReference Include="BCrypt.Net-Next" Version="5.0.0-prerelease.gf86f9271e6"/>
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.0"/>
+    <PackageReference Include="AWSSDK.S3" Version="4.0.23"/>
+    <PackageReference Include="AWSSDK.SQS" Version="4.0.2.28"/>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Domain\Domain.csproj" />
-    <ProjectReference Include="..\Application\Application.csproj" />
+    <ProjectReference Include="..\Domain\Domain.csproj"/>
+    <ProjectReference Include="..\Application\Application.csproj"/>
   </ItemGroup>
 </Project>
