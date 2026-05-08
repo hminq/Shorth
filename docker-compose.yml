@@ -1,5 +1,5 @@
 services:
-  shorth-postgres-db:
+  postgres:
     image: postgres:latest
     container_name: shorth-postgres-db
     env_file:
@@ -14,7 +14,7 @@ services:
       timeout: 5s
       retries: 10
 
-  shorth-redis:
+  redis:
     image: redis:trixie
     container_name: shorth-redis
     env_file:
@@ -41,9 +41,9 @@ services:
     ports:
       - "5050:8080"
     depends_on:
-      shorth-postgres-db:
+      postgres:
         condition: service_healthy
-      shorth-redis:
+      redis:
         condition: service_healthy
 
   worker:
@@ -56,9 +56,9 @@ services:
     environment:
       DOTNET_ENVIRONMENT: Development
     depends_on:
-      shorth-postgres-db:
+      postgres:
         condition: service_healthy
-      shorth-redis:
+      redis:
         condition: service_healthy
 
 volumes:
