@@ -1,9 +1,9 @@
 using Domain.Entities;
 using Domain.Entities.Enums;
-using Infrastucture.Persistence.Configurations;
+using Infrastucture.Database.Configurations;
 using Microsoft.EntityFrameworkCore;
 
-namespace Infrastucture.Persistence;
+namespace Infrastucture.Database;
 
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
@@ -16,9 +16,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.HasPostgresEnum<UserStatus>("user_status");
-        modelBuilder.HasPostgresEnum<IdentityProvider>("identity_provider");
-        modelBuilder.HasPostgresEnum<OtpPurpose>("otp_purpose");
+        modelBuilder.HasPostgresEnum<UserStatus>(name: "user_status");
+        modelBuilder.HasPostgresEnum<IdentityProvider>(name: "identity_provider");
+        modelBuilder.HasPostgresEnum<OtpPurpose>(name: "otp_purpose");
 
         modelBuilder.ApplyConfiguration(new UserConfiguration());
         modelBuilder.ApplyConfiguration(new UserIdentityConfiguration());
