@@ -3,3 +3,7 @@
 
 # AI agents context file
 AGENTS.md
+contexts
+
+# Local Api test file
+api-test
