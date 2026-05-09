@@ -1,5 +1,6 @@
 using System;
 using Domain.Entities.Enums;
+using Domain.Exceptions;
 
 namespace Domain.Entities;
 
@@ -63,21 +64,67 @@ public class UserOtp
 
     public void MarkUsed(DateTime usedAt)
     {
+        EnsureCanBeModified(usedAt, nameof(usedAt));
+
+        if (UsedAt.HasValue)
+        {
+            throw new InvalidOtpStateException("Otp has already been used.");
+        }
+
+        if (HasExceededAttempts())
+        {
+            throw new InvalidOtpStateException("Otp has exceeded the maximum number of attempts.");
+        }
+
         UsedAt = usedAt;
     }
 
     public void Invalidate(DateTime invalidatedAt)
     {
+        EnsureCanBeModified(invalidatedAt, nameof(invalidatedAt));
+
+        if (InvalidatedAt.HasValue)
+        {
+            throw new InvalidOtpStateException("Otp has already been invalidated.");
+        }
+
+        if (UsedAt.HasValue)
+        {
+            throw new InvalidOtpStateException("Used otp cannot be invalidated.");
+        }
+
         InvalidatedAt = invalidatedAt;
     }
 
     public void MarkSent(DateTime sentAt)
     {
+        EnsureCanBeModified(sentAt, nameof(sentAt));
+
+        if (HasExceededAttempts())
+        {
+            throw new InvalidOtpStateException("Cannot mark sent for otp that exceeded max attempts.");
+        }
+
         LastSentAt = sentAt;
     }
 
     public void IncrementAttempt()
     {
+        if (IsUsed())
+        {
+            throw new InvalidOtpStateException("Cannot increment attempts for a used otp.");
+        }
+
+        if (IsInvalidated())
+        {
+            throw new InvalidOtpStateException("Cannot increment attempts for an invalidated otp.");
+        }
+
+        if (HasExceededAttempts())
+        {
+            throw new InvalidOtpStateException("Otp has already exceeded the maximum number of attempts.");
+        }
+
         AttemptCount++;
     }
 
@@ -99,5 +146,23 @@ public class UserOtp
     public bool IsUsed()
     {
         return UsedAt != null;
+    }
+
+    private void EnsureCanBeModified(DateTime at, string paramName)
+    {
+        if (at < CreatedAt)
+        {
+            throw new ArgumentException("Time cannot be earlier than created time.", paramName);
+        }
+
+        if (IsExpired(at))
+        {
+            throw new InvalidOtpStateException("Otp has expired.");
+        }
+
+        if (IsInvalidated())
+        {
+            throw new InvalidOtpStateException("Otp has been invalidated.");
+        }
     }
 }

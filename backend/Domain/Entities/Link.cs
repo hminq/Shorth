@@ -1,4 +1,6 @@
 using System;
+using Domain.Constants;
+using Domain.Exceptions;
 
 namespace Domain.Entities;
 
@@ -25,9 +27,9 @@ public class Link
         DateTime? expiresAt
     )
     {
-        if (string.IsNullOrWhiteSpace(slug) || slug.Length != 6)
+        if (string.IsNullOrWhiteSpace(slug) || slug.Length != SlugRules.SlugLength)
         {
-            throw new ArgumentException("Slug must be a 6 characters string.", nameof(slug));
+            throw new ArgumentException($"Slug must be a {SlugRules.SlugLength} characters string.", nameof(slug));
         }
 
         if (string.IsNullOrWhiteSpace(destinationUrl))
@@ -56,6 +58,16 @@ public class Link
 
     public void Disable(DateTime disabledAt)
     {
+        if (disabledAt < CreatedAt)
+        {
+            throw new ArgumentException("Disabled time cannot be earlier than created time.", nameof(disabledAt));
+        }
+
+        if (IsDisabled)
+        {
+            throw new InvalidLinkStateException("Link is already disabled.");
+        }
+
         IsDisabled = true;
         UpdatedAt = disabledAt;
     }
@@ -67,12 +79,37 @@ public class Link
             throw new ArgumentException("New destination url is required.", nameof(newDestination));
         }
 
+        if (updatedAt < CreatedAt)
+        {
+            throw new ArgumentException("Updated time cannot be earlier than created time.", nameof(updatedAt));
+        }
+
+        if (IsDisabled)
+        {
+            throw new InvalidLinkStateException("Cannot update a disabled link.");
+        }
+
         DestinationUrl = newDestination;
         UpdatedAt = updatedAt;
     }
 
     public void RegisterClick(DateTime clickedAt)
     {
+        if (clickedAt < CreatedAt)
+        {
+            throw new ArgumentException("Clicked time cannot be earlier than created time.", nameof(clickedAt));
+        }
+
+        if (IsDisabled)
+        {
+            throw new InvalidLinkStateException("Cannot register click for a disabled link.");
+        }
+
+        if (ExpiresAt.HasValue && clickedAt >= ExpiresAt.Value)
+        {
+            throw new InvalidLinkStateException("Cannot register click for an expired link.");
+        }
+
         ClickCount++;
         LastClickedAt = clickedAt;
         UpdatedAt = clickedAt;
