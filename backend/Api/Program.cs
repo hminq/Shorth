@@ -1,19 +1,26 @@
+using Api.Exceptions;
 using Infrastucture;
 using Api.HealthChecks;
+using Application.UseCases;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHealthChecks()
     .AddCheck<PostgresHealthCheck>("postgres")
     .AddCheck<RedisHealthCheck>("redis");
+builder.Services.AddScoped<CreateShortLink>();
+builder.Services.AddScoped<ResolveShortLink>();
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 
+app.UseExceptionHandler();
 app.UseHttpsRedirection();
 
 app.UseAuthorization();
