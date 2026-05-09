@@ -1,0 +1,71 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - "scripts/deploy-backend.sh"
+      - ".github/workflows/deploy-backend.yml"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy-backend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_BACKEND_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Api/Dockerfile
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_API_REPOSITORY }}:${{ github.sha }}
+
+      - name: Build and push Worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Worker/Dockerfile
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_WORKER_REPOSITORY }}:${{ github.sha }}
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+
+      - name: Copy deploy script to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST_IP }} "mkdir -p ${{ secrets.DEPLOY_PATH }}/scripts"
+          scp -o StrictHostKeyChecking=no scripts/deploy-backend.sh ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST_IP }}:${{ secrets.DEPLOY_PATH }}/scripts/deploy-backend.sh
+          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST_IP }} "chmod +x ${{ secrets.DEPLOY_PATH }}/scripts/deploy-backend.sh"
+
+      - name: Pull and restart backend services on EC2
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+            ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST_IP }} \
+            "DEPLOY_PATH='${{ secrets.DEPLOY_PATH }}' AWS_REGION='${{ secrets.AWS_REGION }}' ECR_REGISTRY='${ECR_REGISTRY}' IMAGE_TAG='${IMAGE_TAG}' ECR_API_REPOSITORY='${{ secrets.ECR_API_REPOSITORY }}' ECR_WORKER_REPOSITORY='${{ secrets.ECR_WORKER_REPOSITORY }}' bash '${{ secrets.DEPLOY_PATH }}/scripts/deploy-backend.sh'"
