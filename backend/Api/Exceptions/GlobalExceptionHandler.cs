@@ -18,6 +18,24 @@ public sealed class GlobalExceptionHandler(
 
         var problemDetails = exception switch
         {
+            AccountDisableException => new ProblemDetails
+            {
+                Title = "Account disabled",
+                Detail = exception.Message,
+                Status = StatusCodes.Status403Forbidden
+            },
+            WrongCredentialsException => new ProblemDetails
+            {
+                Title = "Wrong credentials",
+                Detail = exception.Message,
+                Status = StatusCodes.Status401Unauthorized
+            },
+            AlternateSignInRequiredException => new ProblemDetails
+            {
+                Title = "Alternate sign-in required",
+                Detail = exception.Message,
+                Status = StatusCodes.Status409Conflict
+            },
             DomainException => new ProblemDetails
             {
                 Title = "Business rule violation",

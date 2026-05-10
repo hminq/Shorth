@@ -9,6 +9,7 @@ using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Resend;
+using Domain.Entities.Enums;
 
 namespace Infrastucture;
 
@@ -69,8 +70,35 @@ public static class DependencyInjection
             throw new InvalidOperationException("Resend API key is not configured.");
         }
 
+        var jwtSigningKey = configuration["Jwt:SigningKey"];
+        if (string.IsNullOrWhiteSpace(jwtSigningKey))
+        {
+            throw new InvalidOperationException("JWT signing key is not configured.");
+        }
+
+        if (jwtSigningKey.Length < 32)
+        {
+            throw new InvalidOperationException("JWT signing key must be at least 32 characters.");
+        }
+
+        var jwtAccessTokenTtlMinutesRaw = configuration["Jwt:AccessTokenTtlMinutes"];
+        if (string.IsNullOrWhiteSpace(jwtAccessTokenTtlMinutesRaw))
+        {
+            throw new InvalidOperationException("JWT access token ttl minutes is not configured.");
+        }
+
+        if (!int.TryParse(jwtAccessTokenTtlMinutesRaw, out var jwtAccessTokenTtlMinutes) || jwtAccessTokenTtlMinutes <= 0)
+        {
+            throw new InvalidOperationException("JWT access token ttl minutes must be a valid positive integer.");
+        }
+
         services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(connectionString));
+            options.UseNpgsql(connectionString, npgsqlOptions =>
+            {
+                npgsqlOptions.MapEnum<IdentityProvider>("identity_provider");
+                npgsqlOptions.MapEnum<UserStatus>("user_status");
+                npgsqlOptions.MapEnum<OtpPurpose>("otp_purpose");
+            }));
 
         services.AddStackExchangeRedisCache(options =>
         {
@@ -97,6 +125,11 @@ public static class DependencyInjection
                 _.GetRequiredService<IDistributedCache>(),
                 TimeSpan.FromHours(redisLinkTtlHours)));
         services.AddScoped<ISlugGenerator, SlugGenerator>();
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IUserIdentityRepository, UserIdentityRepository>();
+        services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
+        services.AddScoped<IJwtTokenGenerator>(_ =>
+            new JwtTokenGenerator(jwtSigningKey, TimeSpan.FromMinutes(jwtAccessTokenTtlMinutes)));
 
         return services;
     }

@@ -19,6 +19,7 @@ builder.Services.AddHealthChecks()
     .AddCheck<ResendHealthCheck>("resend");
 builder.Services.AddScoped<CreateShortLink>();
 builder.Services.AddScoped<ResolveShortLink>();
+builder.Services.AddScoped<LocalLogin>();
 
 var app = builder.Build();
 
