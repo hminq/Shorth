@@ -24,7 +24,7 @@ public class CreateShortLink
         }
 
         var createdAt = DateTime.UtcNow;
-        var slug = await _slugGenerator.GenerateAsync(ct);
+        var slug = _slugGenerator.Generate();
 
         var link = Link.Create(
             request.OwnerId,

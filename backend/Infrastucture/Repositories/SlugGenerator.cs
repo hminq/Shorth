@@ -7,10 +7,8 @@ namespace Infrastucture.Repositories;
 
 public class SlugGenerator : ISlugGenerator
 {
-    public Task<string> GenerateAsync(CancellationToken ct = default)
+    public string Generate()
     {
-        ct.ThrowIfCancellationRequested();
-
         var chars = new char[SlugRules.SlugLength];
 
         for (var i = 0; i < chars.Length; i++)
@@ -19,6 +17,6 @@ public class SlugGenerator : ISlugGenerator
             chars[i] = SlugRules.SlugCharacterSet[index];
         }
 
-        return Task.FromResult(new string(chars));
+        return new string(chars);
     }
 }
