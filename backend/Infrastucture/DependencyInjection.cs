@@ -53,10 +53,16 @@ public static class DependencyInjection
             throw new InvalidOperationException("AWS region is not configured.");
         }
 
-        var sqsQueueUrl = configuration["Sqs:QueueUrl"];
-        if (string.IsNullOrWhiteSpace(sqsQueueUrl))
+        var emailJobsQueueUrl = configuration["Sqs:EmailJobsQueueUrl"];
+        if (string.IsNullOrWhiteSpace(emailJobsQueueUrl))
         {
-            throw new InvalidOperationException("SQS queue url is not configured.");
+            throw new InvalidOperationException("SQS email jobs queue url is not configured.");
+        }
+
+        var clickEventsQueueUrl = configuration["Sqs:ClickEventsQueueUrl"];
+        if (string.IsNullOrWhiteSpace(clickEventsQueueUrl))
+        {
+            throw new InvalidOperationException("SQS click events queue url is not configured.");
         }
 
         var s3BucketName = configuration["S3:BucketName"];
@@ -126,8 +132,17 @@ public static class DependencyInjection
                 _.GetRequiredService<IDistributedCache>(),
                 TimeSpan.FromHours(redisLinkTtlHours)));
         services.AddScoped<ISlugGenerator, SlugGenerator>();
+        services.AddScoped<IClickEventQueue>(_ =>
+            new SqsClickEventQueue(
+                _.GetRequiredService<IAmazonSQS>(),
+                clickEventsQueueUrl));
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IUserIdentityRepository, UserIdentityRepository>();
+        services.AddScoped<ILocalRegistrationRepository, LocalRegistrationRepository>();
+        services.AddScoped<IEmailJobQueue>(_ =>
+            new SqsEmailJobQueue(
+                _.GetRequiredService<IAmazonSQS>(),
+                emailJobsQueueUrl));
         services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
         services.AddScoped<IJwtTokenGenerator>(_ =>
             new JwtTokenGenerator(jwtSigningKey, TimeSpan.FromMinutes(jwtAccessTokenTtlMinutes)));

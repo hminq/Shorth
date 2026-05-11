@@ -12,10 +12,16 @@ public sealed class SqsHealthCheck(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
-        var queueUrl = configuration["Sqs:QueueUrl"];
-        if (string.IsNullOrWhiteSpace(queueUrl))
+        var emailJobsQueueUrl = configuration["Sqs:EmailJobsQueueUrl"];
+        if (string.IsNullOrWhiteSpace(emailJobsQueueUrl))
         {
-            return HealthCheckResult.Unhealthy("SQS queue url is not configured.");
+            return HealthCheckResult.Unhealthy("SQS email jobs queue url is not configured.");
+        }
+
+        var clickEventsQueueUrl = configuration["Sqs:ClickEventsQueueUrl"];
+        if (string.IsNullOrWhiteSpace(clickEventsQueueUrl))
+        {
+            return HealthCheckResult.Unhealthy("SQS click events queue url is not configured.");
         }
 
         try
@@ -23,12 +29,20 @@ public sealed class SqsHealthCheck(
             await sqsClient.GetQueueAttributesAsync(
                 new GetQueueAttributesRequest
                 {
-                    QueueUrl = queueUrl,
+                    QueueUrl = emailJobsQueueUrl,
                     AttributeNames = ["QueueArn"]
                 },
                 cancellationToken);
 
-            return HealthCheckResult.Healthy("SQS is reachable.");
+            await sqsClient.GetQueueAttributesAsync(
+                new GetQueueAttributesRequest
+                {
+                    QueueUrl = clickEventsQueueUrl,
+                    AttributeNames = ["QueueArn"]
+                },
+                cancellationToken);
+
+            return HealthCheckResult.Healthy("SQS queues are reachable.");
         }
         catch (Exception ex)
         {
