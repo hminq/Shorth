@@ -21,6 +21,7 @@ builder.Services.AddHealthChecks()
 builder.Services.AddScoped<CreateShortLinkUseCase>();
 builder.Services.AddScoped<ResolveShortLinkUseCase>();
 builder.Services.AddScoped<LocalLoginUseCase>();
+builder.Services.AddScoped<LocalRegisterUseCase>();
 
 var app = builder.Build();
 
