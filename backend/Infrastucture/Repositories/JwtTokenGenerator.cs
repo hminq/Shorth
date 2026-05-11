@@ -1,8 +1,8 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Application.Abstractions;
-using Domain.Entities;
+using Application.Features.Auth.Interfaces;
+using Domain.Features.Auth.Entities;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Infrastucture.Repositories;

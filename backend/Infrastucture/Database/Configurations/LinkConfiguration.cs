@@ -1,4 +1,5 @@
-using Domain.Entities;
+using Domain.Features.Auth.Entities;
+using Domain.Features.Links.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

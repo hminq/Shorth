@@ -1,4 +1,5 @@
-using Application.Abstractions;
+using Application.Features.Auth.Interfaces;
+using Application.Features.Links.Interfaces;
 using Amazon;
 using Amazon.S3;
 using Amazon.SQS;
@@ -9,7 +10,7 @@ using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Resend;
-using Domain.Entities.Enums;
+using Domain.Features.Auth.Enums;
 
 namespace Infrastucture;
 

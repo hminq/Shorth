@@ -1,6 +1,6 @@
-using Application.Abstractions;
-using Domain.Entities;
-using Domain.Entities.Enums;
+using Application.Features.Auth.Interfaces;
+using Domain.Features.Auth.Entities;
+using Domain.Features.Auth.Enums;
 using Infrastucture.Database;
 using Microsoft.EntityFrameworkCore;
 

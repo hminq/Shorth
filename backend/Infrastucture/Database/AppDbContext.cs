@@ -1,5 +1,6 @@
-using Domain.Entities;
-using Domain.Entities.Enums;
+using Domain.Features.Auth.Entities;
+using Domain.Features.Auth.Enums;
+using Domain.Features.Links.Entities;
 using Infrastucture.Database.Configurations;
 using Microsoft.EntityFrameworkCore;
 

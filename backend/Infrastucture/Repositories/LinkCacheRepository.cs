@@ -1,5 +1,5 @@
 using System;
-using Application.Abstractions;
+using Application.Features.Links.Interfaces;
 using Microsoft.Extensions.Caching.Distributed;
 
 namespace Infrastucture.Repositories;

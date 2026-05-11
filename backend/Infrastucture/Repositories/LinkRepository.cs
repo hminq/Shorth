@@ -1,8 +1,10 @@
 using System;
-using Application.Abstractions;
-using Domain.Entities;
+using Application.Features.Links.Interfaces;
+using Domain.Features.Links.Entities;
+using Domain.Features.Links.Exceptions;
 using Infrastucture.Database;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Infrastucture.Repositories;
 
@@ -22,10 +24,20 @@ public class LinkRepository : ILinkRepository
             await _dbContext.Links.AddAsync(link, ct);
             await _dbContext.SaveChangesAsync(ct);
         }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException postgresException &&
+                                           postgresException.SqlState == PostgresErrorCodes.UniqueViolation)
+        {
+            throw new DuplicateSlugException("Generated slug already exists.");
+        }
         catch (DbUpdateException ex)
         {
             throw new InvalidOperationException("Failed to save link.", ex);
         }
+    }
+
+    public Task<Link?> GetByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        throw new NotImplementedException();
     }
 
     public async Task<Link?> GetBySlugAsync(string slug, CancellationToken ct = default)
@@ -44,4 +56,8 @@ public class LinkRepository : ILinkRepository
             .ToListAsync(ct);
     }
 
+    public Task IncrementClickCountAsync(Guid linkId, DateTime clickedAt, CancellationToken ct = default)
+    {
+        throw new NotImplementedException();
+    }
 }

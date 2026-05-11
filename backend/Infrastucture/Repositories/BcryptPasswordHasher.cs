@@ -1,4 +1,4 @@
-using Application.Abstractions;
+using Application.Features.Auth.Interfaces;
 using BCryptNet;
 
 namespace Infrastucture.Repositories;

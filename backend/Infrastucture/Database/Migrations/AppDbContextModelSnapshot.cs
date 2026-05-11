@@ -25,7 +25,7 @@ namespace Infrastucture.Database.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "user_status", new[] { "pending_verification", "active", "disabled" });
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Domain.Entities.Link", b =>
+            modelBuilder.Entity("Domain.Features.Links.Entities.Link", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -80,7 +80,7 @@ namespace Infrastucture.Database.Migrations
                     b.ToTable("links", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.Entities.LinkClickEvent", b =>
+            modelBuilder.Entity("Domain.Features.Links.Entities.LinkClickEvent", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -136,7 +136,7 @@ namespace Infrastucture.Database.Migrations
                     b.ToTable("link_click_events", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.Entities.LinkDailyStat", b =>
+            modelBuilder.Entity("Domain.Features.Links.Entities.LinkDailyStat", b =>
                 {
                     b.Property<Guid>("LinkId")
                         .HasColumnType("uuid")
@@ -167,7 +167,7 @@ namespace Infrastucture.Database.Migrations
                     b.ToTable("link_daily_stats", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.Entities.User", b =>
+            modelBuilder.Entity("Domain.Features.Auth.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -222,7 +222,7 @@ namespace Infrastucture.Database.Migrations
                     b.ToTable("users", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.Entities.UserIdentity", b =>
+            modelBuilder.Entity("Domain.Features.Auth.Entities.UserIdentity", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -270,7 +270,7 @@ namespace Infrastucture.Database.Migrations
                     b.ToTable("user_identities", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.Entities.UserOtp", b =>
+            modelBuilder.Entity("Domain.Features.Auth.Entities.UserOtp", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
@@ -327,44 +327,44 @@ namespace Infrastucture.Database.Migrations
                     b.ToTable("user_otps", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.Entities.Link", b =>
+            modelBuilder.Entity("Domain.Features.Links.Entities.Link", b =>
                 {
-                    b.HasOne("Domain.Entities.User", null)
+                    b.HasOne("Domain.Features.Auth.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("OwnerId")
                         .OnDelete(DeleteBehavior.SetNull);
                 });
 
-            modelBuilder.Entity("Domain.Entities.LinkClickEvent", b =>
+            modelBuilder.Entity("Domain.Features.Links.Entities.LinkClickEvent", b =>
                 {
-                    b.HasOne("Domain.Entities.Link", null)
+                    b.HasOne("Domain.Features.Links.Entities.Link", null)
                         .WithMany()
                         .HasForeignKey("LinkId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Domain.Entities.LinkDailyStat", b =>
+            modelBuilder.Entity("Domain.Features.Links.Entities.LinkDailyStat", b =>
                 {
-                    b.HasOne("Domain.Entities.Link", null)
+                    b.HasOne("Domain.Features.Links.Entities.Link", null)
                         .WithMany()
                         .HasForeignKey("LinkId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Domain.Entities.UserIdentity", b =>
+            modelBuilder.Entity("Domain.Features.Auth.Entities.UserIdentity", b =>
                 {
-                    b.HasOne("Domain.Entities.User", null)
+                    b.HasOne("Domain.Features.Auth.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Domain.Entities.UserOtp", b =>
+            modelBuilder.Entity("Domain.Features.Auth.Entities.UserOtp", b =>
                 {
-                    b.HasOne("Domain.Entities.User", null)
+                    b.HasOne("Domain.Features.Auth.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)

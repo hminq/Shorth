@@ -1,5 +1,5 @@
-using Application.Abstractions;
-using Domain.Entities;
+using Application.Features.Auth.Interfaces;
+using Domain.Features.Auth.Entities;
 using Infrastucture.Database;
 using Microsoft.EntityFrameworkCore;
 

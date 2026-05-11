@@ -1,6 +1,6 @@
 using System;
-using Application.Abstractions;
-using Domain.Constants;
+using Application.Features.Links.Interfaces;
+using Domain.Features.Links.Constants;
 using System.Security.Cryptography;
 
 namespace Infrastucture.Repositories;

@@ -6,10 +6,6 @@
     <UserSecretsId>1a4d1f6c-9f9a-48e1-b568-44fea91a46af</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
-    <Folder Include="Controllers/" />
-    <Folder Include="Dtos/" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\Application\Application.csproj" />
     <ProjectReference Include="..\Infrastucture\Infrastucture.csproj" />
   </ItemGroup>
