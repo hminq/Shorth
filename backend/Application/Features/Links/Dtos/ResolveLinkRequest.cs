@@ -1,5 +1,5 @@
 namespace Application.Features.Links.Dtos;
 
-public record class ResolveLinkRequest(
+public sealed record ResolveLinkRequest(
     string Slug
 );
