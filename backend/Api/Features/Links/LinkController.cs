@@ -8,12 +8,12 @@ namespace Api.Features.Links
     [Route("api/links")]
     [ApiController]
     public sealed class LinkController(
-        CreateShortLink createShortLink,
-        ResolveShortLink resolveShortLink
+        CreateShortLinkUseCase createShortLink,
+        ResolveShortLinkUseCase resolveShortLink
         ) : ControllerBase
     {
-        private readonly CreateShortLink _createShortLink = createShortLink;
-        private readonly ResolveShortLink _resolveShortLink = resolveShortLink;
+        private readonly CreateShortLinkUseCase _createShortLink = createShortLink;
+        private readonly ResolveShortLinkUseCase _resolveShortLink = resolveShortLink;
 
         [HttpPost]
         public async Task<ActionResult<CreateLinkHttpResponse>> CreateNewLink(

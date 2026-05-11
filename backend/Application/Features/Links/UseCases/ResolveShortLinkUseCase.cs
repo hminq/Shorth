@@ -18,7 +18,7 @@ public class ResolveShortLinkUseCase
         _linkCacheRepository = linkCacheRepository;
     }
 
-    public async Task<ResolveLinkResponse> ExecuteAsync(ResolveLinkRequest request, CancellationToken ct)
+    public async Task<ResolveLinkResult> ExecuteAsync(ResolveLinkRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Slug))
         {
@@ -36,7 +36,7 @@ public class ResolveShortLinkUseCase
         // if cache hit, return destinationUrl
         if (cachedDestinationUrl != null)
         {
-            return new ResolveLinkResponse(cachedDestinationUrl);
+            return new ResolveLinkResult(cachedDestinationUrl);
         }
 
         // check database if cache miss
@@ -59,10 +59,10 @@ public class ResolveShortLinkUseCase
             // set cache
             await _linkCacheRepository.SetDestinationUrlBySlugAsync(link.Slug, link.DestinationUrl, ct);
             
-            return new ResolveLinkResponse(link.DestinationUrl);
+            return new ResolveLinkResult(link.DestinationUrl);
         }
 
         // not found
-        return new ResolveLinkResponse(null);
+        return new ResolveLinkResult(null);
     }
 }
