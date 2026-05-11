@@ -37,6 +37,12 @@ public sealed class GlobalExceptionHandler(
                 Detail = exception.Message,
                 Status = StatusCodes.Status409Conflict
             },
+            EmailAlreadyExistedException => new ProblemDetails
+            {
+                Title = "Email already exists",
+                Detail = exception.Message,
+                Status = StatusCodes.Status409Conflict
+            },
             DomainException => new ProblemDetails
             {
                 Title = "Business rule violation",
