@@ -18,25 +18,25 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("DefaultConnection");
+        var connectionString = configuration["DB_CONNECTION_STRING"];
         if (string.IsNullOrWhiteSpace(connectionString))
         {
-            throw new InvalidOperationException("DefaultConnection is not configured.");
+            throw new InvalidOperationException("DB connection string is not configured.");
         }
 
-        var redisConnectionString = configuration.GetConnectionString("Redis");
+        var redisConnectionString = configuration["REDIS_CONNECTION_STRING"];
         if (string.IsNullOrWhiteSpace(redisConnectionString))
         {
             throw new InvalidOperationException("Redis connection string is not configured.");
         }
 
-        var redisInstanceName = configuration["Redis:InstanceName"];
+        var redisInstanceName = configuration["REDIS_INSTANCE_NAME"];
         if (string.IsNullOrWhiteSpace(redisInstanceName))
         {
             throw new InvalidOperationException("Redis instance name is not configured.");
         }
 
-        var redisLinkTtlHour = configuration["Redis:LinkDestinationUrlTtlHours"];
+        var redisLinkTtlHour = configuration["REDIS_LINK_DESTINATION_URL_TTL_HOURS"];
         if (string.IsNullOrWhiteSpace(redisLinkTtlHour))
         {
             throw new InvalidOperationException("Redis link ttl is not configured.");
@@ -53,19 +53,19 @@ public static class DependencyInjection
             throw new InvalidOperationException("AWS region is not configured.");
         }
 
-        var emailJobsQueueUrl = configuration["Sqs:EmailJobsQueueUrl"];
+        var emailJobsQueueUrl = configuration["SQS_EMAIL_JOBS_QUEUE_URL"];
         if (string.IsNullOrWhiteSpace(emailJobsQueueUrl))
         {
             throw new InvalidOperationException("SQS email jobs queue url is not configured.");
         }
 
-        var clickEventsQueueUrl = configuration["Sqs:ClickEventsQueueUrl"];
+        var clickEventsQueueUrl = configuration["SQS_CLICK_EVENTS_QUEUE_URL"];
         if (string.IsNullOrWhiteSpace(clickEventsQueueUrl))
         {
             throw new InvalidOperationException("SQS click events queue url is not configured.");
         }
 
-        var s3BucketName = configuration["S3:BucketName"];
+        var s3BucketName = configuration["S3_BUCKET_NAME"];
         if (string.IsNullOrWhiteSpace(s3BucketName))
         {
             throw new InvalidOperationException("S3 bucket name is not configured.");
@@ -77,7 +77,19 @@ public static class DependencyInjection
             throw new InvalidOperationException("Resend API key is not configured.");
         }
 
-        var jwtSigningKey = configuration["Jwt:SigningKey"];
+        var emailFromAddress = configuration["EMAIL_FROM_ADDRESS"];
+        if (string.IsNullOrWhiteSpace(emailFromAddress))
+        {
+            throw new InvalidOperationException("Email from address is not configured.");
+        }
+
+        var emailLogoUrl = configuration["EMAIL_LOGO_URL"];
+        if (string.IsNullOrWhiteSpace(emailLogoUrl))
+        {
+            throw new InvalidOperationException("Email logo url is not configured.");
+        }
+
+        var jwtSigningKey = configuration["JWT_SIGNING_KEY"];
         if (string.IsNullOrWhiteSpace(jwtSigningKey))
         {
             throw new InvalidOperationException("JWT signing key is not configured.");
@@ -88,7 +100,7 @@ public static class DependencyInjection
             throw new InvalidOperationException("JWT signing key must be at least 32 characters.");
         }
 
-        var jwtAccessTokenTtlMinutesRaw = configuration["Jwt:AccessTokenTtlMinutes"];
+        var jwtAccessTokenTtlMinutesRaw = configuration["JWT_ACCESS_TOKEN_TTL_MINUTES"];
         if (string.IsNullOrWhiteSpace(jwtAccessTokenTtlMinutesRaw))
         {
             throw new InvalidOperationException("JWT access token ttl minutes is not configured.");
@@ -138,11 +150,14 @@ public static class DependencyInjection
                 clickEventsQueueUrl));
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IUserIdentityRepository, UserIdentityRepository>();
+        services.AddScoped<IUserOtpRepository, UserOtpRepository>();
         services.AddScoped<ILocalRegistrationRepository, LocalRegistrationRepository>();
+        services.AddScoped<IOtpCodeGenerator, RandomOtpCodeGenerator>();
         services.AddScoped<IEmailJobQueue>(_ =>
             new SqsEmailJobQueue(
                 _.GetRequiredService<IAmazonSQS>(),
                 emailJobsQueueUrl));
+        services.AddScoped<IEmailService, ResendEmailService>();
         services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
         services.AddScoped<IJwtTokenGenerator>(_ =>
             new JwtTokenGenerator(jwtSigningKey, TimeSpan.FromMinutes(jwtAccessTokenTtlMinutes)));
