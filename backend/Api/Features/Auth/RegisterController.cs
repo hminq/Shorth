@@ -1,6 +1,6 @@
 using Api.Features.Auth.Dtos;
 using Application.Features.Auth.Dtos;
-using Application.Features.Auth.UseCases;
+using Application.Features.Auth.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Features.Auth;
@@ -9,11 +9,11 @@ namespace Api.Features.Auth;
 [ApiController]
 public sealed class RegisterController : ControllerBase
 {
-    private readonly LocalRegisterUseCase _localRegisterUseCase;
+    private readonly AuthService _authService;
 
-    public RegisterController(LocalRegisterUseCase localRegisterUseCase)
+    public RegisterController(AuthService authService)
     {
-        _localRegisterUseCase = localRegisterUseCase;
+        _authService = authService;
     }
 
     [HttpPost("local")]
@@ -21,14 +21,43 @@ public sealed class RegisterController : ControllerBase
         [FromBody] LocalRegisterHttpRequest request,
         CancellationToken ct)
     {
-        var useCaseRequest = ToUseCaseRequest(request);
-        var registerResult = await _localRegisterUseCase.ExecuteAsync(useCaseRequest, ct);
+        var serviceRequest = ToServiceRequest(request);
+        var registerResult = await _authService.LocalRegisterAsync(serviceRequest, ct);
         var response = ToHttpResponse(registerResult);
 
         return Ok(response);
     }
 
-    private static LocalRegisterRequest ToUseCaseRequest(LocalRegisterHttpRequest request)
+    [HttpPost("local/resend-verification-otp")]
+    public async Task<ActionResult<ResendVerificationOtpHttpResponse>> ResendVerificationOtp(
+        [FromBody] ResendVerificationOtpHttpRequest request,
+        CancellationToken ct)
+    {
+        var serviceRequest = new ResendVerificationOtpRequest(request.Email);
+        var resendResult = await _authService.ResendVerificationOtpAsync(serviceRequest, ct);
+        var response = new ResendVerificationOtpHttpResponse(
+            resendResult.Email,
+            resendResult.RequiresEmailVerification);
+
+        return Ok(response);
+    }
+
+    [HttpPost("local/verify-email-otp")]
+    public async Task<ActionResult<VerifyEmailOtpHttpResponse>> VerifyEmailOtp(
+        [FromBody] VerifyEmailOtpHttpRequest request,
+        CancellationToken ct)
+    {
+        var serviceRequest = new VerifyEmailOtpRequest(request.Email, request.OtpCode);
+        var verifyResult = await _authService.VerifyEmailOtpAsync(serviceRequest, ct);
+        var response = new VerifyEmailOtpHttpResponse(
+            verifyResult.UserId,
+            verifyResult.Email,
+            verifyResult.EmailVerified);
+
+        return Ok(response);
+    }
+
+    private static LocalRegisterRequest ToServiceRequest(LocalRegisterHttpRequest request)
     {
         return new LocalRegisterRequest(
             request.Email,

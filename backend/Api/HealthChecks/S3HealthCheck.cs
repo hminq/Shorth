@@ -12,7 +12,7 @@ public sealed class S3HealthCheck(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
-        var bucketName = configuration["S3:BucketName"];
+        var bucketName = configuration["S3_BUCKET_NAME"];
         if (string.IsNullOrWhiteSpace(bucketName))
         {
             return HealthCheckResult.Unhealthy("S3 bucket name is not configured.");

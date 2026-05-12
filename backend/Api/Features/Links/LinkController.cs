@@ -1,6 +1,6 @@
 using Api.Features.Links.Dtos;
 using Application.Features.Links.Dtos;
-using Application.Features.Links.UseCases;
+using Application.Features.Links.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Features.Links
@@ -8,12 +8,10 @@ namespace Api.Features.Links
     [Route("api/links")]
     [ApiController]
     public sealed class LinkController(
-        CreateShortLinkUseCase createShortLink,
-        ResolveShortLinkUseCase resolveShortLink
+        LinkService linkService
         ) : ControllerBase
     {
-        private readonly CreateShortLinkUseCase _createShortLink = createShortLink;
-        private readonly ResolveShortLinkUseCase _resolveShortLink = resolveShortLink;
+        private readonly LinkService _linkService = linkService;
 
         [HttpPost]
         public async Task<ActionResult<CreateLinkHttpResponse>> CreateNewLink(
@@ -21,9 +19,9 @@ namespace Api.Features.Links
             CancellationToken ct
             )
         {
-            var useCaseRequest = ToUseCaseRequest(request);
+            var serviceRequest = ToServiceRequest(request);
 
-            var result = await _createShortLink.ExecuteAsync(useCaseRequest, ct);
+            var result = await _linkService.CreateShortLinkAsync(serviceRequest, ct);
 
             var response = ToHttpResponse(result);
 
@@ -35,9 +33,9 @@ namespace Api.Features.Links
             [FromRoute] string slug,
             CancellationToken ct)
         {
-            var useCaseRequest = ToUseCaseRequest(slug);
+            var serviceRequest = ToServiceRequest(slug);
 
-            var result = await _resolveShortLink.ExecuteAsync(useCaseRequest, ct);
+            var result = await _linkService.ResolveShortLinkAsync(serviceRequest, ct);
 
             if (result.DestinationUrl is null)
             {
@@ -53,7 +51,7 @@ namespace Api.Features.Links
         }
 
         // Mapper methods
-        private static CreateLinkRequest ToUseCaseRequest(CreateLinkHttpRequest request) {
+        private static CreateLinkRequest ToServiceRequest(CreateLinkHttpRequest request) {
             return new CreateLinkRequest(
                 request.OwnerId,
                 request.DestinationUrl,
@@ -61,7 +59,7 @@ namespace Api.Features.Links
             );
         }
 
-        private static ResolveLinkRequest ToUseCaseRequest(string slug)
+        private static ResolveLinkRequest ToServiceRequest(string slug)
         {
             return new ResolveLinkRequest(slug);
         }

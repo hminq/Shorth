@@ -37,11 +37,59 @@ public sealed class GlobalExceptionHandler(
                 Detail = exception.Message,
                 Status = StatusCodes.Status409Conflict
             },
+            EmailVerificationPendingException => new ProblemDetails
+            {
+                Title = "Email verification pending",
+                Detail = exception.Message,
+                Status = StatusCodes.Status409Conflict
+            },
+            EmailVerificationRequiredException => new ProblemDetails
+            {
+                Title = "Email verification required",
+                Detail = exception.Message,
+                Status = StatusCodes.Status409Conflict
+            },
+            EmailVerificationNotPendingException => new ProblemDetails
+            {
+                Title = "Email verification not pending",
+                Detail = exception.Message,
+                Status = StatusCodes.Status409Conflict
+            },
+            EmailAlreadyVerifiedException => new ProblemDetails
+            {
+                Title = "Email already verified",
+                Detail = exception.Message,
+                Status = StatusCodes.Status409Conflict
+            },
             EmailAlreadyExistedException => new ProblemDetails
             {
                 Title = "Email already exists",
                 Detail = exception.Message,
                 Status = StatusCodes.Status409Conflict
+            },
+            OtpResendTooSoonException => new ProblemDetails
+            {
+                Title = "Otp resend too soon",
+                Detail = exception.Message,
+                Status = StatusCodes.Status429TooManyRequests
+            },
+            VerificationOtpInactiveException => new ProblemDetails
+            {
+                Title = "Verification code inactive",
+                Detail = exception.Message,
+                Status = StatusCodes.Status409Conflict
+            },
+            OtpMaxAttemptsExceededException => new ProblemDetails
+            {
+                Title = "Otp max attempts exceeded",
+                Detail = exception.Message,
+                Status = StatusCodes.Status409Conflict
+            },
+            WrongOtpException => new ProblemDetails
+            {
+                Title = "Wrong otp",
+                Detail = exception.Message,
+                Status = StatusCodes.Status400BadRequest
             },
             DomainException => new ProblemDetails
             {

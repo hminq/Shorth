@@ -12,13 +12,13 @@ public sealed class SqsHealthCheck(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
-        var emailJobsQueueUrl = configuration["Sqs:EmailJobsQueueUrl"];
+        var emailJobsQueueUrl = configuration["SQS_EMAIL_JOBS_QUEUE_URL"];
         if (string.IsNullOrWhiteSpace(emailJobsQueueUrl))
         {
             return HealthCheckResult.Unhealthy("SQS email jobs queue url is not configured.");
         }
 
-        var clickEventsQueueUrl = configuration["Sqs:ClickEventsQueueUrl"];
+        var clickEventsQueueUrl = configuration["SQS_CLICK_EVENTS_QUEUE_URL"];
         if (string.IsNullOrWhiteSpace(clickEventsQueueUrl))
         {
             return HealthCheckResult.Unhealthy("SQS click events queue url is not configured.");

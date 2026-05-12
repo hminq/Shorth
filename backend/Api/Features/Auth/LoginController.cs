@@ -1,6 +1,6 @@
 using Api.Features.Auth.Dtos;
 using Application.Features.Auth.Dtos;
-using Application.Features.Auth.UseCases;
+using Application.Features.Auth.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Features.Auth
@@ -9,13 +9,13 @@ namespace Api.Features.Auth
     [ApiController]
     public sealed class LoginController : ControllerBase
     {
-        private readonly LocalLoginUseCase _localLoginUseCase;
+        private readonly AuthService _authService;
 
         public LoginController(
-            LocalLoginUseCase localLogin
+            AuthService authService
         )
         {
-            _localLoginUseCase = localLogin;
+            _authService = authService;
         }
 
         [HttpPost("local")]
@@ -23,15 +23,15 @@ namespace Api.Features.Auth
             [FromBody] LocalLoginHttpRequest request,
             CancellationToken ct)
         {
-            var useCaseRequest = ToUseCaseRequest(request);
+            var serviceRequest = ToServiceRequest(request);
 
-            var loginResult = await _localLoginUseCase.ExecuteAsync(useCaseRequest, ct);
+            var loginResult = await _authService.LocalLoginAsync(serviceRequest, ct);
             var response = ToHttpResponse(loginResult);
 
             return Ok(response);
         }
 
-        private LocalLoginRequest ToUseCaseRequest(LocalLoginHttpRequest request)
+        private static LocalLoginRequest ToServiceRequest(LocalLoginHttpRequest request)
         {
             return new LocalLoginRequest(request.Email, request.Password);
         }

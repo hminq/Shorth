@@ -1,8 +1,8 @@
 using Api.Exceptions;
 using Infrastucture;
 using Api.HealthChecks;
-using Application.Features.Auth.UseCases;
-using Application.Features.Links.UseCases;
+using Application.Features.Auth.Services;
+using Application.Features.Links.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -18,10 +18,8 @@ builder.Services.AddHealthChecks()
     .AddCheck<S3HealthCheck>("s3")
     .AddCheck<SqsHealthCheck>("sqs")
     .AddCheck<ResendHealthCheck>("resend");
-builder.Services.AddScoped<CreateShortLinkUseCase>();
-builder.Services.AddScoped<ResolveShortLinkUseCase>();
-builder.Services.AddScoped<LocalLoginUseCase>();
-builder.Services.AddScoped<LocalRegisterUseCase>();
+builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<LinkService>();
 
 var app = builder.Build();
 
