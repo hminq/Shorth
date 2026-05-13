@@ -11,6 +11,11 @@ if [[ -z "${AWS_REGION:-}" ]]; then
   exit 1
 fi
 
+if [[ -z "${AWS_SECRETS_MANAGER_SECRET_NAME:-}" ]]; then
+  echo "AWS_SECRETS_MANAGER_SECRET_NAME is required."
+  exit 1
+fi
+
 if [[ -z "${ECR_REGISTRY:-}" ]]; then
   echo "ECR_REGISTRY is required."
   exit 1
@@ -45,6 +50,8 @@ export ECR_REGISTRY
 export ECR_API_REPOSITORY
 export ECR_WORKER_REPOSITORY
 export IMAGE_TAG
+export AWS_REGION
+export AWS_SECRETS_MANAGER_SECRET_NAME
 
 docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d

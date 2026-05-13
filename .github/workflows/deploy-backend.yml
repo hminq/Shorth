@@ -68,4 +68,4 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no \
             ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST_IP }} \
-            "DEPLOY_PATH='${{ secrets.DEPLOY_PATH }}' AWS_REGION='${{ secrets.AWS_REGION }}' ECR_REGISTRY='${ECR_REGISTRY}' IMAGE_TAG='${IMAGE_TAG}' ECR_API_REPOSITORY='${{ secrets.ECR_API_REPOSITORY }}' ECR_WORKER_REPOSITORY='${{ secrets.ECR_WORKER_REPOSITORY }}' bash '${{ secrets.DEPLOY_PATH }}/scripts/deploy-backend.sh'"
+            "DEPLOY_PATH='${{ secrets.DEPLOY_PATH }}' AWS_REGION='${{ secrets.AWS_REGION }}' AWS_SECRETS_MANAGER_SECRET_NAME='${{ secrets.AWS_SECRETS_MANAGER_SECRET_NAME }}' ECR_REGISTRY='${ECR_REGISTRY}' IMAGE_TAG='${IMAGE_TAG}' ECR_API_REPOSITORY='${{ secrets.ECR_API_REPOSITORY }}' ECR_WORKER_REPOSITORY='${{ secrets.ECR_WORKER_REPOSITORY }}' bash '${{ secrets.DEPLOY_PATH }}/scripts/deploy-backend.sh'"
