@@ -31,6 +31,16 @@ namespace Api.Features.Auth
             return Ok(response);
         }
 
+        [HttpGet("google")]
+        public async Task<ActionResult<GoogleLoginUrlHttpResponse>> GenerateGoogleLoginUrl(
+            CancellationToken ct)
+        {
+            var result = await _authService.GenerateGoogleLoginUrlAsync(ct);
+            var response = new GoogleLoginUrlHttpResponse(result.AuthorizationUrl);
+
+            return Ok(response);
+        }
+
         private static LocalLoginRequest ToServiceRequest(LocalLoginHttpRequest request)
         {
             return new LocalLoginRequest(request.Email, request.Password);

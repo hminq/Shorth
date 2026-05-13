@@ -1,6 +1,6 @@
 using Application.Features.Auth.Interfaces;
 using Application.Features.Auth.Messages;
-using Microsoft.Extensions.Configuration;
+using Infrastucture.Configurations;
 using Resend;
 
 namespace Infrastucture.Repositories;
@@ -13,15 +13,13 @@ public sealed class ResendEmailService : IEmailService
     private readonly string _logoUrl;
     private readonly string _projectName;
 
-    public ResendEmailService(IResend resend, IConfiguration configuration)
+    public ResendEmailService(IResend resend, EmailOptions options)
     {
         _resend = resend;
-        _fromAddress = configuration["EMAIL_FROM_ADDRESS"]
-            ?? throw new InvalidOperationException("Email from address is not configured.");
-        _fromName = configuration["EMAIL_FROM_NAME"] ?? "Short";
-        _logoUrl = configuration["EMAIL_LOGO_URL"]
-            ?? throw new InvalidOperationException("Email logo url is not configured.");
-        _projectName = configuration["EMAIL_PROJECT_NAME"] ?? "Short";
+        _fromAddress = options.FromAddress;
+        _fromName = options.FromName;
+        _logoUrl = options.LogoUrl;
+        _projectName = options.ProjectName;
     }
 
     public async Task SendAsync(EmailJobMessage message, CancellationToken ct = default)

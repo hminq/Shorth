@@ -1,4 +1,5 @@
 using Api.Exceptions;
+using Infrastucture.Configurations;
 using Infrastucture;
 using Api.HealthChecks;
 using Application.Features.Auth.Services;
@@ -6,6 +7,7 @@ using Application.Features.Links.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
+await builder.Configuration.AddSecretsIfProductionAsync(builder.Environment.IsProduction());
 
 // Add services to the container.
 builder.Services.AddControllers();

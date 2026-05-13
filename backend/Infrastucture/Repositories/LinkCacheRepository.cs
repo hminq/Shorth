@@ -6,10 +6,14 @@ namespace Infrastucture.Repositories;
 
 public class LinkCacheRepository : ILinkCacheRepository
 {
+    private const string KeyPrefix = "link:destination:";
+
     private readonly IDistributedCache _cache;
     private readonly TimeSpan _cacheDuration;
 
-    public LinkCacheRepository(IDistributedCache cache, TimeSpan cacheDuration)
+    public LinkCacheRepository(
+        IDistributedCache cache,
+        TimeSpan cacheDuration)
     {
         _cache = cache;
         _cacheDuration = cacheDuration;
@@ -17,7 +21,7 @@ public class LinkCacheRepository : ILinkCacheRepository
 
     public async Task<string?> GetDestinationUrlBySlugAsync(string slug, CancellationToken ct = default)
     {
-        return await _cache.GetStringAsync(slug, ct);
+        return await _cache.GetStringAsync(BuildKey(slug), ct);
     }
 
     public async Task SetDestinationUrlBySlugAsync(string slug, string destinationUrl, CancellationToken ct = default)
@@ -27,6 +31,11 @@ public class LinkCacheRepository : ILinkCacheRepository
             AbsoluteExpirationRelativeToNow = _cacheDuration
         };
 
-        await _cache.SetStringAsync(slug, destinationUrl, options, ct);
+        await _cache.SetStringAsync(BuildKey(slug), destinationUrl, options, ct);
+    }
+
+    private string BuildKey(string slug)
+    {
+        return $"{KeyPrefix}{slug}";
     }
 }

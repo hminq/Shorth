@@ -3,7 +3,7 @@ using Amazon.SQS;
 using Amazon.SQS.Model;
 using Application.Features.Auth.Interfaces;
 using Application.Features.Auth.Messages;
-using Microsoft.Extensions.Options;
+using Infrastucture.Configurations;
 
 namespace Worker;
 
@@ -16,18 +16,18 @@ public sealed class EmailJobWorker : BackgroundService
     private readonly ILogger<EmailJobWorker> _logger;
     private readonly IAmazonSQS _sqsClient;
     private readonly IEmailService _emailService;
-    private readonly EmailWorkerOptions _options;
+    private readonly string _queueUrl;
 
     public EmailJobWorker(
         ILogger<EmailJobWorker> logger,
         IAmazonSQS sqsClient,
         IEmailService emailService,
-        IOptions<EmailWorkerOptions> options)
+        SqsOptions options)
     {
         _logger = logger;
         _sqsClient = sqsClient;
         _emailService = emailService;
-        _options = options.Value;
+        _queueUrl = options.EmailJobsQueueUrl;
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -37,7 +37,7 @@ public sealed class EmailJobWorker : BackgroundService
             var response = await _sqsClient.ReceiveMessageAsync(
                 new ReceiveMessageRequest
                 {
-                    QueueUrl = _options.QueueUrl,
+                    QueueUrl = _queueUrl,
                     MaxNumberOfMessages = MaxMessagesPerPoll,
                     WaitTimeSeconds = LongPollSeconds
                 },
@@ -114,7 +114,7 @@ public sealed class EmailJobWorker : BackgroundService
         await _sqsClient.DeleteMessageAsync(
             new DeleteMessageRequest
             {
-                QueueUrl = _options.QueueUrl,
+                QueueUrl = _queueUrl,
                 ReceiptHandle = sqsMessage.ReceiptHandle
             },
             ct);

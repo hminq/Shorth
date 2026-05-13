@@ -1,6 +1,7 @@
 using Application.Features.Auth.Dtos;
 using Application.Features.Auth.Interfaces;
 using Application.Features.Auth.Messages;
+using System.Security.Cryptography;
 using Domain.Features.Auth.Constants;
 using Domain.Features.Auth.Entities;
 using Domain.Features.Auth.Enums;
@@ -20,6 +21,8 @@ public sealed class AuthService
     private readonly IOtpCodeGenerator _otpCodeGenerator;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly IGoogleAuthProvider _googleAuthProvider;
+    private readonly IGoogleAuthStateRepository _googleAuthStateStore;
 
     public AuthService(
         IUserRepository userRepository,
@@ -29,7 +32,9 @@ public sealed class AuthService
         IEmailJobQueue emailJobQueue,
         IOtpCodeGenerator otpCodeGenerator,
         IJwtTokenGenerator jwtTokenGenerator,
-        IPasswordHasher passwordHasher)
+        IPasswordHasher passwordHasher,
+        IGoogleAuthProvider googleAuthProvider,
+        IGoogleAuthStateRepository googleAuthStateStore)
     {
         _userRepository = userRepository;
         _userIdentityRepository = userIdentityRepository;
@@ -39,6 +44,21 @@ public sealed class AuthService
         _otpCodeGenerator = otpCodeGenerator;
         _jwtTokenGenerator = jwtTokenGenerator;
         _passwordHasher = passwordHasher;
+        _googleAuthProvider = googleAuthProvider;
+        _googleAuthStateStore = googleAuthStateStore;
+    }
+
+    public async Task<GoogleLoginUrlResult> GenerateGoogleLoginUrlAsync(CancellationToken ct = default)
+    {
+        var createdAt = DateTime.UtcNow;
+        var state = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        var authState = new GoogleAuthState(createdAt);
+
+        await _googleAuthStateStore.StoreAsync(state, authState, ct);
+
+        var authorizationUrl = _googleAuthProvider.BuildAuthorizationUrl(state);
+
+        return new GoogleLoginUrlResult(authorizationUrl);
     }
 
     public async Task<LoginResult> LocalLoginAsync(LocalLoginRequest request, CancellationToken ct = default)

@@ -1,8 +1,5 @@
-using System;
-
 namespace Application.Features.Auth.Dtos;
 
-public sealed record GoogleLoginRequest
-{
-
-}
+public sealed record GoogleLoginRequest(
+    string Code,
+    string? State);
