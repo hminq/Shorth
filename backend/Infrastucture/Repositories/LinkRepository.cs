@@ -35,9 +35,11 @@ public class LinkRepository : ILinkRepository
         }
     }
 
-    public Task<Link?> GetByIdAsync(Guid id, CancellationToken ct = default)
+    public async Task<Link?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
-        throw new NotImplementedException();
+        return await _dbContext.Links
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == id, ct);
     }
 
     public async Task<Link?> GetBySlugAsync(string slug, CancellationToken ct = default)
@@ -47,12 +49,18 @@ public class LinkRepository : ILinkRepository
             .FirstOrDefaultAsync(x => x.Slug == slug, ct);
     }
 
-    public async Task<IReadOnlyList<Link>> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<Link>> GetByOwnerIdAsync(
+        Guid ownerId,
+        int skip,
+        int take,
+        CancellationToken ct = default)
     {
         return await _dbContext.Links
             .AsNoTracking()
-            .Where(x => x.OwnerId == userId)
+            .Where(x => x.OwnerId == ownerId)
             .OrderByDescending(x => x.CreatedAt)
+            .Skip(skip)
+            .Take(take)
             .ToListAsync(ct);
     }
 

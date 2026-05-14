@@ -8,7 +8,5 @@ public sealed class CreateLinkHttpRequest
     [Url]
     public string DestinationUrl { get; init; } = default!;
 
-    public Guid? OwnerId { get; init; }
-
     public DateTime? ExpiresAt { get; init; }
 }
