@@ -9,10 +9,18 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
     "typescript": "~6.0.2",
     "vite": "^8.0.10"
   },
   "dependencies": {
-    "google-auth-library": "^10.6.2"
+    "@phosphor-icons/react": "^2.1.10",
+    "@types/qrcode": "^1.5.6",
+    "google-auth-library": "^10.6.2",
+    "qrcode": "^1.5.4",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1"
   }
 }
