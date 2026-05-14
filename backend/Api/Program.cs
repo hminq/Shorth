@@ -14,6 +14,20 @@ await builder.Configuration.AddSecretsIfProductionAsync(builder.Environment.IsPr
 
 // Add services to the container.
 builder.Services.AddControllers();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("WebClient", policy =>
+    {
+        var allowedOrigin = builder.Environment.IsDevelopment()
+            ? "http://localhost:5173"
+            : "https://shorth.it.com";
+
+        policy
+            .WithOrigins(allowedOrigin)
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -54,6 +68,7 @@ var app = builder.Build();
 app.UseExceptionHandler();
 app.UseHttpsRedirection();
 
+app.UseCors("WebClient");
 app.UseAuthentication();
 app.UseAuthorization();
 
