@@ -16,7 +16,7 @@ public sealed class RegisterController : ControllerBase
         _authService = authService;
     }
 
-    [HttpPost("local")]
+    [HttpPost]
     public async Task<ActionResult<RegisterHttpResponse>> LocalRegister(
         [FromBody] LocalRegisterHttpRequest request,
         CancellationToken ct)
@@ -24,35 +24,6 @@ public sealed class RegisterController : ControllerBase
         var serviceRequest = ToServiceRequest(request);
         var registerResult = await _authService.LocalRegisterAsync(serviceRequest, ct);
         var response = ToHttpResponse(registerResult);
-
-        return Ok(response);
-    }
-
-    [HttpPost("local/resend-verification-otp")]
-    public async Task<ActionResult<ResendVerificationOtpHttpResponse>> ResendVerificationOtp(
-        [FromBody] ResendVerificationOtpHttpRequest request,
-        CancellationToken ct)
-    {
-        var serviceRequest = new ResendVerificationOtpRequest(request.Email);
-        var resendResult = await _authService.ResendVerificationOtpAsync(serviceRequest, ct);
-        var response = new ResendVerificationOtpHttpResponse(
-            resendResult.Email,
-            resendResult.RequiresEmailVerification);
-
-        return Ok(response);
-    }
-
-    [HttpPost("local/verify-email-otp")]
-    public async Task<ActionResult<VerifyEmailOtpHttpResponse>> VerifyEmailOtp(
-        [FromBody] VerifyEmailOtpHttpRequest request,
-        CancellationToken ct)
-    {
-        var serviceRequest = new VerifyEmailOtpRequest(request.Email, request.OtpCode);
-        var verifyResult = await _authService.VerifyEmailOtpAsync(serviceRequest, ct);
-        var response = new VerifyEmailOtpHttpResponse(
-            verifyResult.UserId,
-            verifyResult.Email,
-            verifyResult.EmailVerified);
 
         return Ok(response);
     }
