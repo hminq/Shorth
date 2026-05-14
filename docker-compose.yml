@@ -38,6 +38,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
+      Logging__LogLevel__Default: Debug
+      Logging__LogLevel__Microsoft.AspNetCore: Information
     ports:
       - "5050:8080"
     depends_on:
@@ -55,6 +57,8 @@ services:
       - ./backend/.env
     environment:
       DOTNET_ENVIRONMENT: Development
+      Logging__LogLevel__Default: Debug
+      Logging__LogLevel__Microsoft.Hosting.Lifetime: Information
     depends_on:
       postgres:
         condition: service_healthy

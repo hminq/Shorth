@@ -11,46 +11,68 @@ public sealed class EmailJobWorker : BackgroundService
 {
     private const int MaxMessagesPerPoll = 10;
     private const int LongPollSeconds = 20;
+    private static readonly TimeSpan PollFailureDelay = TimeSpan.FromSeconds(5);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly ILogger<EmailJobWorker> _logger;
     private readonly IAmazonSQS _sqsClient;
-    private readonly IEmailService _emailService;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly string _queueUrl;
 
     public EmailJobWorker(
         ILogger<EmailJobWorker> logger,
         IAmazonSQS sqsClient,
-        IEmailService emailService,
+        IServiceScopeFactory scopeFactory,
         SqsOptions options)
     {
         _logger = logger;
         _sqsClient = sqsClient;
-        _emailService = emailService;
+        _scopeFactory = scopeFactory;
         _queueUrl = options.EmailJobsQueueUrl;
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
+        _logger.LogInformation(
+            "Email job worker started. QueueUrl: {QueueUrl}, MaxMessagesPerPoll: {MaxMessagesPerPoll}, LongPollSeconds: {LongPollSeconds}",
+            _queueUrl,
+            MaxMessagesPerPoll,
+            LongPollSeconds);
+
         while (!ct.IsCancellationRequested)
         {
-            var response = await _sqsClient.ReceiveMessageAsync(
-                new ReceiveMessageRequest
+            try
+            {
+                _logger.LogDebug("Polling email jobs queue.");
+
+                var response = await _sqsClient.ReceiveMessageAsync(
+                    new ReceiveMessageRequest
+                    {
+                        QueueUrl = _queueUrl,
+                        MaxNumberOfMessages = MaxMessagesPerPoll,
+                        WaitTimeSeconds = LongPollSeconds
+                    },
+                    ct);
+
+                if (response.Messages is null || response.Messages.Count == 0)
                 {
-                    QueueUrl = _queueUrl,
-                    MaxNumberOfMessages = MaxMessagesPerPoll,
-                    WaitTimeSeconds = LongPollSeconds
-                },
-                ct);
+                    _logger.LogDebug("No email job messages received.");
+                    continue;
+                }
 
-            if (response.Messages.Count == 0)
-            {
-                continue;
+                foreach (var message in response.Messages)
+                {
+                    await ProcessMessageAsync(message, ct);
+                }
             }
-
-            foreach (var message in response.Messages)
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                await ProcessMessageAsync(message, ct);
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to poll email jobs queue.");
+                await Task.Delay(PollFailureDelay, ct);
             }
         }
     }
@@ -79,7 +101,10 @@ public sealed class EmailJobWorker : BackgroundService
 
         try
         {
-            await _emailService.SendAsync(emailJob, ct);
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
+
+            await emailService.SendAsync(emailJob, ct);
             await DeleteMessageAsync(sqsMessage, ct);
 
             _logger.LogInformation(
