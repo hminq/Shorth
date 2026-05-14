@@ -104,7 +104,7 @@ public sealed class ResendEmailService : IEmailService
                           {System.Net.WebUtility.HtmlEncode(_projectName)}
                         </div>
                       </div>
-                      <h1 style="margin:0 0 18px;font-size:40px;line-height:1.18;font-weight:500;color:#202124;">
+                      <h1 style="margin:0 0 18px;font-size:40px;line-height:1.18;font-weight:500;color:#202124;text-align:center;">
                         {title}
                       </h1>
                       <div style="height:1px;background:#dadce0;margin:0 0 28px;"></div>
