@@ -41,6 +41,20 @@ namespace Api.Features.Auth
             return Ok(response);
         }
 
+        [HttpGet("~/api/oauth-google")]
+        public async Task<ActionResult<LoginHttpResponse>> GoogleLoginCallback(
+            [FromQuery] string code,
+            [FromQuery] string? state,
+            CancellationToken ct)
+        {
+            var loginResult = await _authService.GoogleLoginAsync(
+                new GoogleLoginRequest(code, state),
+                ct);
+            var response = ToHttpResponse(loginResult);
+
+            return Ok(response);
+        }
+
         private static LocalLoginRequest ToServiceRequest(LocalLoginHttpRequest request)
         {
             return new LocalLoginRequest(request.Email, request.Password);

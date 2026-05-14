@@ -1,6 +1,7 @@
 using Application.Features.Auth.Dtos;
 using Application.Features.Auth.Interfaces;
 using Application.Features.Auth.Messages;
+using Application.Features.Auth.Utilities;
 using System.Security.Cryptography;
 using Domain.Features.Auth.Constants;
 using Domain.Features.Auth.Entities;
@@ -17,6 +18,7 @@ public sealed class AuthService
     private readonly IUserIdentityRepository _userIdentityRepository;
     private readonly IUserOtpRepository _userOtpRepository;
     private readonly ILocalRegistrationRepository _localRegistrationRepository;
+    private readonly IExternalIdentityRepository _externalIdentityRepository;
     private readonly IEmailJobQueue _emailJobQueue;
     private readonly IOtpCodeGenerator _otpCodeGenerator;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
@@ -29,6 +31,7 @@ public sealed class AuthService
         IUserIdentityRepository userIdentityRepository,
         IUserOtpRepository userOtpRepository,
         ILocalRegistrationRepository localRegistrationRepository,
+        IExternalIdentityRepository externalIdentityRepository,
         IEmailJobQueue emailJobQueue,
         IOtpCodeGenerator otpCodeGenerator,
         IJwtTokenGenerator jwtTokenGenerator,
@@ -40,6 +43,7 @@ public sealed class AuthService
         _userIdentityRepository = userIdentityRepository;
         _userOtpRepository = userOtpRepository;
         _localRegistrationRepository = localRegistrationRepository;
+        _externalIdentityRepository = externalIdentityRepository;
         _emailJobQueue = emailJobQueue;
         _otpCodeGenerator = otpCodeGenerator;
         _jwtTokenGenerator = jwtTokenGenerator;
@@ -61,6 +65,102 @@ public sealed class AuthService
         return new GoogleLoginUrlResult(authorizationUrl);
     }
 
+    public async Task<LoginResult> GoogleLoginAsync(GoogleLoginRequest request, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Code))
+        {
+            throw new ArgumentException("Authorization code is required.", nameof(request));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.State))
+        {
+            throw new InvalidGoogleAuthStateException("Google auth state is missing.");
+        }
+
+        if (await _googleAuthStateStore.TakeAsync(request.State, ct) is null)
+        {
+            throw new InvalidGoogleAuthStateException("Google auth state is invalid or expired.");
+        }
+
+        var googleUserInfo = await _googleAuthProvider.GetUserInfoAsync(request, ct);
+        if (string.IsNullOrWhiteSpace(googleUserInfo.Email) || !googleUserInfo.IsEmailVerified)
+        {
+            throw new GoogleEmailUnavailableException("Google account must provide a verified email address.");
+        }
+
+        var email = googleUserInfo.Email.Trim();
+        var normalizedEmail = EmailNormalizer.Normalize(email);
+        var now = DateTime.UtcNow;
+
+        var googleIdentity = await _userIdentityRepository.GetByProviderAndProviderUserIdAsync(
+            IdentityProvider.Google,
+            googleUserInfo.ProviderUserId,
+            ct);
+
+        if (googleIdentity is not null)
+        {
+            var user = await _userRepository.GetByIdAsync(googleIdentity.UserId, ct);
+            if (user is null)
+            {
+                throw new InvalidOperationException("Something is wrong with your account.");
+            }
+
+            return await SignInGoogleUserAsync(user, now, ct);
+        }
+
+        var existingUser = await _userRepository.GetByEmailNormalizedAsync(normalizedEmail, ct);
+        if (existingUser is not null)
+        {
+            if (existingUser.Status == UserStatus.Disabled)
+            {
+                throw new AccountDisableException("This account is disabled.");
+            }
+
+            var linkedGoogleIdentity = UserIdentity.CreateExternal(
+                existingUser.Id,
+                IdentityProvider.Google,
+                googleUserInfo.ProviderUserId,
+                email,
+                now);
+
+            if (!existingUser.EmailVerifiedAt.HasValue)
+            {
+                existingUser.VerifyEmail(now);
+            }
+
+            existingUser.UpdateProfile(
+                googleUserInfo.DisplayName ?? existingUser.DisplayName,
+                existingUser.AvatarUrl,
+                now);
+            existingUser.MarkLastLogin(now);
+
+            await _externalIdentityRepository.LinkAsync(existingUser, linkedGoogleIdentity, ct);
+
+            return CreateLoginResult(existingUser);
+        }
+
+        var newUser = User.CreateOAuth(
+            IdentityProvider.Google,
+            email,
+            normalizedEmail,
+            googleUserInfo.DisplayName,
+            avatarUrl: null,
+            now);
+        newUser.VerifyEmail(now);
+        newUser.MarkLastLogin(now);
+
+        var newGoogleIdentity = UserIdentity.CreateExternal(
+            newUser.Id,
+            IdentityProvider.Google,
+            googleUserInfo.ProviderUserId,
+            email,
+            now);
+
+        await _externalIdentityRepository.CreateAsync(newUser, newGoogleIdentity, ct);
+
+        return CreateLoginResult(newUser);
+    }
+
     public async Task<LoginResult> LocalLoginAsync(LocalLoginRequest request, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(request.Email))
@@ -73,7 +173,7 @@ public sealed class AuthService
             throw new ArgumentException("Password is required.", nameof(request));
         }
 
-        var emailNormalized = request.Email.Trim().ToLowerInvariant();
+        var emailNormalized = EmailNormalizer.Normalize(request.Email);
         var foundLocalIdentity = await _userIdentityRepository.GetLocalByEmailNormalizedAsync(emailNormalized, ct);
 
         if (foundLocalIdentity is null)
@@ -90,7 +190,7 @@ public sealed class AuthService
             if (identities.Any(x => x.Provider != IdentityProvider.Local))
             {
                 throw new AlternateSignInRequiredException(
-                    "This email address uses another sign-in method. Continue with that provider or set a password first.");
+                    "This email address uses a different sign-in method. Continue with that method or reset/set a password.");
             }
 
             throw new InvalidOperationException("Something is wrong with your account.");
@@ -128,12 +228,7 @@ public sealed class AuthService
 
         var accessToken = _jwtTokenGenerator.GenerateToken(foundUser);
 
-        return new LoginResult(
-            accessToken,
-            foundUser.Id,
-            foundUser.Email ?? string.Empty,
-            foundUser.DisplayName ?? string.Empty
-        );
+        return CreateLoginResult(foundUser, accessToken);
     }
 
     public async Task<RegisterResult> LocalRegisterAsync(LocalRegisterRequest request, CancellationToken ct = default)
@@ -148,7 +243,7 @@ public sealed class AuthService
             throw new ArgumentException("Password is required.", nameof(request));
         }
 
-        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        var normalizedEmail = EmailNormalizer.Normalize(request.Email);
         var email = request.Email.Trim();
         var displayName = string.IsNullOrWhiteSpace(request.DisplayName) ? string.Empty : request.DisplayName.Trim();
         var foundUser = await _userRepository.GetByEmailNormalizedAsync(normalizedEmail, ct);
@@ -219,7 +314,7 @@ public sealed class AuthService
             if (identities.Any(x => x.Provider != IdentityProvider.Local))
             {
                 throw new AlternateSignInRequiredException(
-                    "This email address uses another sign-in method. Continue with that provider or set a password first.");
+                    "This email address uses a different sign-in method. Continue with that method or reset/set a password.");
             }
 
             throw new InvalidOperationException("Something is wrong with your account.");
@@ -274,7 +369,7 @@ public sealed class AuthService
         }
 
         var email = request.Email.Trim();
-        var normalizedEmail = email.ToLowerInvariant();
+        var normalizedEmail = EmailNormalizer.Normalize(email);
         var foundUser = await _userRepository.GetByEmailNormalizedAsync(normalizedEmail, ct);
         if (foundUser is null)
         {
@@ -351,7 +446,7 @@ public sealed class AuthService
         }
 
         var email = request.Email.Trim();
-        var normalizedEmail = email.ToLowerInvariant();
+        var normalizedEmail = EmailNormalizer.Normalize(email);
         var foundUser = await _userRepository.GetByEmailNormalizedAsync(normalizedEmail, ct);
         if (foundUser is null)
         {
@@ -414,5 +509,32 @@ public sealed class AuthService
             && !otp.IsInvalidated()
             && !otp.IsExpired(at)
             && !otp.HasExceededAttempts();
+    }
+
+    private async Task<LoginResult> SignInGoogleUserAsync(User user, DateTime signedInAt, CancellationToken ct)
+    {
+        if (user.Status == UserStatus.Disabled)
+        {
+            throw new AccountDisableException("This account is disabled.");
+        }
+
+        user.MarkLastLogin(signedInAt);
+        await _userRepository.UpdateAsync(user, ct);
+
+        return CreateLoginResult(user);
+    }
+
+    private LoginResult CreateLoginResult(User user)
+    {
+        return CreateLoginResult(user, _jwtTokenGenerator.GenerateToken(user));
+    }
+
+    private static LoginResult CreateLoginResult(User user, string accessToken)
+    {
+        return new LoginResult(
+            accessToken,
+            user.Id,
+            user.Email ?? string.Empty,
+            user.DisplayName ?? string.Empty);
     }
 }

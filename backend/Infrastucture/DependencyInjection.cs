@@ -125,6 +125,7 @@ public static class DependencyInjection
         services.AddScoped<IUserIdentityRepository, UserIdentityRepository>();
         services.AddScoped<IUserOtpRepository, UserOtpRepository>();
         services.AddScoped<ILocalRegistrationRepository, LocalRegistrationRepository>();
+        services.AddScoped<IExternalIdentityRepository, ExternalIdentityRepository>();
         services.AddScoped<IOtpCodeGenerator, RandomOtpCodeGenerator>();
         services.AddScoped<IGoogleAuthProvider, GoogleAuthProvider>();
         services.AddScoped<IGoogleAuthStateRepository>(provider =>

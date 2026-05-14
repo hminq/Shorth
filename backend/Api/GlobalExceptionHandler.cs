@@ -67,6 +67,18 @@ public sealed class GlobalExceptionHandler(
                 Detail = exception.Message,
                 Status = StatusCodes.Status409Conflict
             },
+            InvalidGoogleAuthStateException => new ProblemDetails
+            {
+                Title = "Invalid Google auth state",
+                Detail = exception.Message,
+                Status = StatusCodes.Status400BadRequest
+            },
+            GoogleEmailUnavailableException => new ProblemDetails
+            {
+                Title = "Google email unavailable",
+                Detail = exception.Message,
+                Status = StatusCodes.Status409Conflict
+            },
             OtpResendTooSoonException => new ProblemDetails
             {
                 Title = "Otp resend too soon",
