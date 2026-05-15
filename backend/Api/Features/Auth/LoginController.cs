@@ -63,6 +63,22 @@ namespace Api.Features.Auth
             return Redirect($"{_authCookieOptions.WebBaseUrl}/auth/callback");
         }
 
+        [HttpPost("~/api/logout")]
+        public IActionResult Logout()
+        {
+            Response.Cookies.Delete(
+                _authCookieOptions.CookieName,
+                new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = _environment.IsProduction(),
+                    SameSite = _environment.IsProduction() ? SameSiteMode.None : SameSiteMode.Lax,
+                    Path = "/"
+                });
+
+            return NoContent();
+        }
+
         private static LocalLoginRequest ToServiceRequest(LocalLoginHttpRequest request)
         {
             return new LocalLoginRequest(request.Email, request.Password);
