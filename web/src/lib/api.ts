@@ -35,7 +35,7 @@ export async function createAnonymousLink(
   destinationUrl: string,
   captchaToken?: string
 ): Promise<CreateLinkResponse> {
-  const response = await safeFetch(`${API_BASE_URL}/api/links`, {
+  const response = await safeFetch('/api/links', {
     method: 'POST',
     credentials: 'include',
     headers: {
@@ -52,7 +52,7 @@ export async function createAnonymousLink(
 }
 
 export async function loginLocal(email: string, password: string): Promise<LoginResponse> {
-  const response = await safeFetch(`${API_BASE_URL}/api/login/local`, {
+  const response = await safeFetch('/api/login/local', {
     method: 'POST',
     credentials: 'include',
     headers: {
@@ -69,7 +69,7 @@ export async function loginLocal(email: string, password: string): Promise<Login
 }
 
 export async function getGoogleLoginUrl(): Promise<string> {
-  const response = await safeFetch(`${API_BASE_URL}/api/login/google`, {
+  const response = await safeFetch('/api/login/google', {
     credentials: 'include'
   })
 
@@ -105,6 +105,19 @@ export function getAuthSession(): AuthSession | null {
   }
 }
 
+export async function logout() {
+  const response = await safeFetch('/api/logout', {
+    method: 'POST',
+    credentials: 'include'
+  })
+
+  localStorage.removeItem('shorth.auth')
+
+  if (!response.ok) {
+    throw new Error(await readProblemMessage(response))
+  }
+}
+
 export function shortUrl(slug: string) {
   return `${API_BASE_URL}/${slug}`
 }
@@ -125,9 +138,9 @@ async function readProblemMessage(response: Response) {
   return problem?.detail || problem?.title || `Request failed with status ${response.status}.`
 }
 
-async function safeFetch(input: RequestInfo | URL, init?: RequestInit) {
+async function safeFetch(path: string, init?: RequestInit) {
   try {
-    return await fetch(input, init)
+    return await fetch(`${API_BASE_URL}${path}`, init)
   } catch {
     throw new Error('Could not reach Shorth right now. Please check your connection and try again.')
   }
