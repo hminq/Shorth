@@ -31,14 +31,17 @@ type ProblemDetails = {
   status?: number
 }
 
-export async function createAnonymousLink(destinationUrl: string): Promise<CreateLinkResponse> {
+export async function createAnonymousLink(
+  destinationUrl: string,
+  captchaToken?: string
+): Promise<CreateLinkResponse> {
   const response = await safeFetch(`${API_BASE_URL}/api/links`, {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ destinationUrl })
+    body: JSON.stringify({ destinationUrl, captchaToken })
   })
 
   if (!response.ok) {

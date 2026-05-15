@@ -1,11 +1,32 @@
 import QRCode from 'qrcode'
 import { ArrowSquareOut, Copy, DownloadSimple } from '@phosphor-icons/react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { createAnonymousLink, shortUrl } from '../lib/api'
+import { createAnonymousLink, getAuthSession, shortUrl } from '../lib/api'
 import { Button } from './Button'
 
 const RECENT_LINKS_KEY = 'shorth.recentAnonymousLinks'
 const MaxRecentLinks = 3
+const TurnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        element: HTMLElement,
+        options: {
+          sitekey: string
+          theme: 'light'
+          size: 'normal'
+          callback: (token: string) => void
+          'expired-callback': () => void
+          'error-callback': () => void
+        }
+      ) => string
+      reset: (widgetId: string) => void
+      remove: (widgetId: string) => void
+    }
+  }
+}
 
 type FormState =
   | { status: 'idle' }
@@ -24,8 +45,14 @@ type RecentLink = {
 export function LinkForm() {
   const [state, setState] = useState<FormState>({ status: 'idle' })
   const [recentLinks, setRecentLinks] = useState<RecentLink[]>(() => readRecentLinks())
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const [captchaReady, setCaptchaReady] = useState(false)
+  const [showCaptchaHelper, setShowCaptchaHelper] = useState(true)
   const qrCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const resultRef = useRef<HTMLDivElement | null>(null)
+  const turnstileRef = useRef<HTMLDivElement | null>(null)
+  const turnstileWidgetIdRef = useRef<string | null>(null)
+  const isAuthenticated = getAuthSession() !== null
 
   useEffect(() => {
     if (state.status !== 'success' || !qrCanvasRef.current) {
@@ -41,6 +68,75 @@ export function LinkForm() {
       }
     })
   }, [state])
+
+  useEffect(() => {
+    if (!captchaReady) {
+      setShowCaptchaHelper(true)
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setShowCaptchaHelper(false)
+    }, 1500)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [captchaReady])
+
+  useEffect(() => {
+    if (isAuthenticated || !TurnstileSiteKey || !turnstileRef.current) {
+      return
+    }
+
+    let script = document.querySelector<HTMLScriptElement>('script[data-turnstile-script="true"]')
+    if (!script) {
+      script = document.createElement('script')
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+      script.async = true
+      script.defer = true
+      script.dataset.turnstileScript = 'true'
+      document.head.append(script)
+    }
+
+    const renderWidget = () => {
+      if (!window.turnstile || !turnstileRef.current || turnstileWidgetIdRef.current) {
+        return
+      }
+
+      turnstileWidgetIdRef.current = window.turnstile.render(turnstileRef.current, {
+        sitekey: TurnstileSiteKey,
+        theme: 'light',
+        size: 'normal',
+        callback: token => {
+          setCaptchaToken(token)
+          setCaptchaReady(true)
+        },
+        'expired-callback': () => {
+          setCaptchaToken(null)
+          setCaptchaReady(false)
+        },
+        'error-callback': () => {
+          setCaptchaToken(null)
+          setCaptchaReady(false)
+        }
+      })
+    }
+
+    if (window.turnstile) {
+      renderWidget()
+    } else {
+      script.addEventListener('load', renderWidget, { once: true })
+    }
+
+    return () => {
+      script.removeEventListener('load', renderWidget)
+      if (turnstileWidgetIdRef.current && window.turnstile) {
+        window.turnstile.remove(turnstileWidgetIdRef.current)
+        turnstileWidgetIdRef.current = null
+      }
+    }
+  }, [isAuthenticated])
 
   useEffect(() => {
     if (state.status !== 'success') {
@@ -72,10 +168,15 @@ export function LinkForm() {
       return
     }
 
+    if (!isAuthenticated && !captchaToken) {
+      setState({ status: 'error', message: 'Please complete the human check first.' })
+      return
+    }
+
     setState({ status: 'loading', message: 'Creating link...' })
 
     try {
-      const link = await createAnonymousLink(destinationUrl)
+      const link = await createAnonymousLink(destinationUrl, captchaToken ?? undefined)
       const recentLink = {
         id: link.id,
         slug: link.slug,
@@ -87,8 +188,18 @@ export function LinkForm() {
       const nextRecentLinks = saveRecentLink(recentLink)
       setRecentLinks(nextRecentLinks)
       setState({ status: 'success', link: recentLink })
+      setCaptchaToken(null)
+      setCaptchaReady(false)
+      if (turnstileWidgetIdRef.current && window.turnstile) {
+        window.turnstile.reset(turnstileWidgetIdRef.current)
+      }
       form.reset()
     } catch (error) {
+      setCaptchaToken(null)
+      setCaptchaReady(false)
+      if (turnstileWidgetIdRef.current && window.turnstile) {
+        window.turnstile.reset(turnstileWidgetIdRef.current)
+      }
       setState({
         status: 'error',
         message: error instanceof Error ? error.message : 'Could not create short link.'
@@ -171,6 +282,24 @@ export function LinkForm() {
               {state.status === 'success' ? 'Shorten another' : 'Shorten'}
             </Button>
           </div>
+          {!isAuthenticated && state.status !== 'success' && (
+            <div className={`turnstile-row ${captchaReady && !showCaptchaHelper ? 'is-complete' : ''}`}>
+              {TurnstileSiteKey ? (
+                <>
+                  <div ref={turnstileRef} className="turnstile-widget" />
+                  {showCaptchaHelper && (
+                    <p className="turnstile-helper">
+                      {captchaReady ? 'Human check ready.' : 'Cloudflare will verify this request.'}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="turnstile-helper is-error">
+                  Human check is not configured.
+                </p>
+              )}
+            </div>
+          )}
         </form>
 
         {state.status !== 'idle' && state.status !== 'success' && (
@@ -181,20 +310,6 @@ export function LinkForm() {
 
         {state.status === 'success' && (
           <div ref={resultRef} className="expanded-result result-with-qr">
-            <div className="qr-result-card" aria-label="QR code for short link">
-              <canvas ref={qrCanvasRef} width="220" height="220" />
-              <div className="qr-actions">
-                <button className="action-button" type="button" onClick={downloadPngQrCode}>
-                  <DownloadSimple size={16} weight="bold" />
-                  PNG
-                </button>
-                <button className="action-button" type="button" onClick={() => void downloadSvgQrCode()}>
-                  <DownloadSimple size={16} weight="bold" />
-                  SVG
-                </button>
-              </div>
-            </div>
-
             <div className="link-result-card">
               <LinkSummary link={state.link} />
               <div className="result-actions">
@@ -205,6 +320,20 @@ export function LinkForm() {
                 <button className="action-button action-button-dark" type="button" onClick={() => void copyLink(state.link.shortUrl)}>
                   <Copy size={16} weight="bold" />
                   Copy
+                </button>
+              </div>
+            </div>
+
+            <div className="qr-result-card" aria-label="QR code for short link">
+              <canvas ref={qrCanvasRef} width="220" height="220" />
+              <div className="qr-actions">
+                <button className="action-button" type="button" onClick={downloadPngQrCode}>
+                  <DownloadSimple size={16} weight="bold" />
+                  PNG
+                </button>
+                <button className="action-button" type="button" onClick={() => void downloadSvgQrCode()}>
+                  <DownloadSimple size={16} weight="bold" />
+                  SVG
                 </button>
               </div>
             </div>

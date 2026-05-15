@@ -122,6 +122,11 @@ a {
   background: var(--secondary);
 }
 
+.nav-links .button-primary:hover svg,
+.nav-links .button-primary:focus-visible svg {
+  color: var(--accent);
+}
+
 .user-chip {
   gap: 8px;
   color: var(--secondary);
@@ -501,6 +506,32 @@ h2 {
   min-height: 48px;
 }
 
+.turnstile-row {
+  display: grid;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.turnstile-row.is-complete {
+  display: none;
+}
+
+.turnstile-widget {
+  min-height: 65px;
+}
+
+.turnstile-helper {
+  margin: 0;
+  color: var(--secondary);
+  font-family: "Space Mono", monospace;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.turnstile-helper.is-error {
+  color: var(--red);
+}
+
 .result-panel {
   margin: 0 24px 24px;
   padding: 16px;
@@ -523,7 +554,7 @@ h2 {
 }
 
 .result-with-qr {
-  grid-template-columns: 250px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 250px;
   align-items: start;
 }
 
@@ -641,6 +672,11 @@ h2 {
   background: var(--black);
 }
 
+.action-button:hover svg,
+.action-button:focus-visible svg {
+  color: var(--accent);
+}
+
 .action-button:active {
   border-width: 5px;
   color: var(--accent);
@@ -655,6 +691,11 @@ h2 {
 .action-button-dark:focus-visible {
   color: var(--secondary);
   background: var(--white);
+}
+
+.action-button-dark:hover svg,
+.action-button-dark:focus-visible svg {
+  color: var(--accent);
 }
 
 .recent-links {

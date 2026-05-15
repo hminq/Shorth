@@ -44,6 +44,7 @@ jobs:
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
           VITE_GITHUB_CLIENT_ID: ${{ secrets.VITE_GITHUB_CLIENT_ID }}
           VITE_CLOUDFRONT_URL: ${{ secrets.VITE_CLOUDFRONT_URL }}
+          VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY }}
         run: npm run build
 
       - name: Sync dist contents to S3
