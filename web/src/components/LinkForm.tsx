@@ -136,7 +136,7 @@ export function LinkForm() {
         turnstileWidgetIdRef.current = null
       }
     }
-  }, [isAuthenticated])
+  }, [isAuthenticated, state.status])
 
   useEffect(() => {
     if (state.status !== 'success') {
@@ -155,6 +155,9 @@ export function LinkForm() {
     event.preventDefault()
 
     if (state.status === 'success') {
+      setCaptchaToken(null)
+      setCaptchaReady(false)
+      setShowCaptchaHelper(true)
       setState({ status: 'idle' })
       return
     }
