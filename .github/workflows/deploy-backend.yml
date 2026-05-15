@@ -54,12 +54,10 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
 
-      - name: Copy backend deploy files to EC2
+      - name: Copy backend deploy script to EC2
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST_IP }} "mkdir -p ${{ secrets.DEPLOY_PATH }}/scripts"
           scp -o StrictHostKeyChecking=no backend/scripts/deploy-backend.sh ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST_IP }}:${{ secrets.DEPLOY_PATH }}/scripts/deploy-backend.sh
-          scp -o StrictHostKeyChecking=no backend/docker-compose.prod.yml ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST_IP }}:${{ secrets.DEPLOY_PATH }}/docker-compose.prod.yml
-          scp -o StrictHostKeyChecking=no backend/nginx.conf ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST_IP }}:${{ secrets.DEPLOY_PATH }}/nginx.conf
           ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST_IP }} "chmod +x ${{ secrets.DEPLOY_PATH }}/scripts/deploy-backend.sh"
 
       - name: Pull and restart backend services on EC2
