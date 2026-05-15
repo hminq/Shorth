@@ -1,3 +1,4 @@
+using Api.Configurations;
 using Api.Features.Auth.Dtos;
 using Application.Features.Auth.Dtos;
 using Application.Features.Auth.Services;
@@ -10,12 +11,18 @@ namespace Api.Features.Auth
     public sealed class LoginController : ControllerBase
     {
         private readonly AuthService _authService;
+        private readonly AuthCookieOptions _authCookieOptions;
+        private readonly IWebHostEnvironment _environment;
 
         public LoginController(
-            AuthService authService
+            AuthService authService,
+            AuthCookieOptions authCookieOptions,
+            IWebHostEnvironment environment
         )
         {
             _authService = authService;
+            _authCookieOptions = authCookieOptions;
+            _environment = environment;
         }
 
         [HttpPost("local")]
@@ -26,6 +33,7 @@ namespace Api.Features.Auth
             var serviceRequest = ToServiceRequest(request);
 
             var loginResult = await _authService.LocalLoginAsync(serviceRequest, ct);
+            SetAccessTokenCookie(loginResult.AccessToken);
             var response = ToHttpResponse(loginResult);
 
             return Ok(response);
@@ -50,9 +58,9 @@ namespace Api.Features.Auth
             var loginResult = await _authService.GoogleLoginAsync(
                 new GoogleLoginRequest(code, state),
                 ct);
-            var response = ToHttpResponse(loginResult);
+            SetAccessTokenCookie(loginResult.AccessToken);
 
-            return Ok(response);
+            return Redirect($"{_authCookieOptions.WebBaseUrl}/auth/callback");
         }
 
         private static LocalLoginRequest ToServiceRequest(LocalLoginHttpRequest request)
@@ -68,6 +76,21 @@ namespace Api.Features.Auth
                 result.Email,
                 result.DisplayName
             );
+        }
+
+        private void SetAccessTokenCookie(string accessToken)
+        {
+            Response.Cookies.Append(
+                _authCookieOptions.CookieName,
+                accessToken,
+                new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = _environment.IsProduction(),
+                    SameSite = _environment.IsProduction() ? SameSiteMode.None : SameSiteMode.Lax,
+                    Path = "/",
+                    Expires = DateTimeOffset.UtcNow.AddMinutes(_authCookieOptions.AccessTokenTtlMinutes)
+                });
         }
     }
 }

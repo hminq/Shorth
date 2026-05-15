@@ -1,4 +1,5 @@
 using Api.Exceptions;
+using Api.Configurations;
 using Infrastucture.Configurations;
 using Infrastucture;
 using Api.HealthChecks;
@@ -14,23 +15,22 @@ await builder.Configuration.AddSecretsIfProductionAsync(builder.Environment.IsPr
 
 // Add services to the container.
 builder.Services.AddControllers();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+builder.Services.AddInfrastructure(builder.Configuration);
+var authCookieOptions = ReadAuthCookieOptions(builder.Configuration, builder.Environment.IsProduction());
+builder.Services.AddSingleton(authCookieOptions);
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("WebClient", policy =>
     {
-        var allowedOrigin = builder.Environment.IsDevelopment()
-            ? "http://localhost:5173"
-            : "https://shorth.it.com";
-
         policy
-            .WithOrigins(allowedOrigin)
+            .WithOrigins(authCookieOptions.WebBaseUrl)
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
-builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
-builder.Services.AddProblemDetails();
-builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -49,6 +49,19 @@ builder.Services
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
             ClockSkew = TimeSpan.FromMinutes(1)
+        };
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                if (string.IsNullOrWhiteSpace(context.Token)
+                    && context.Request.Cookies.TryGetValue(authCookieOptions.CookieName, out var cookieToken))
+                {
+                    context.Token = cookieToken;
+                }
+
+                return Task.CompletedTask;
+            }
         };
     });
 builder.Services.AddAuthorization();
@@ -75,9 +88,41 @@ app.UseAuthorization();
 app.MapControllers();
 
 // health check endpoints
-app.MapHealthChecks("/health");
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = HealthCheckResponseWriter.WriteAsync
+});
 
 // ping endpoint
-app.MapGet("/ping", () => Results.Ok(new { status = "Healthy", timestamp = DateTime.UtcNow }));
+app.MapMethods("/ping", ["GET", "HEAD"], () => 
+    Results.Ok(new { status = "Healthy", timestamp = DateTime.UtcNow }));
 
 app.Run();
+
+static AuthCookieOptions ReadAuthCookieOptions(IConfiguration configuration, bool isProduction)
+{
+    var webBaseUrl = configuration["WEB_BASE_URL"];
+    if (string.IsNullOrWhiteSpace(webBaseUrl))
+    {
+        if (isProduction)
+        {
+            throw new InvalidOperationException("Web base url is not configured.");
+        }
+
+        webBaseUrl = "http://localhost:5173";
+    }
+
+    var cookieName = configuration["AUTH_COOKIE_NAME"];
+    if (string.IsNullOrWhiteSpace(cookieName))
+    {
+        cookieName = "shorth_access_token";
+    }
+
+    var accessTokenTtl = configuration["JWT_ACCESS_TOKEN_TTL_MINUTES"];
+    if (!int.TryParse(accessTokenTtl, out var accessTokenTtlMinutes) || accessTokenTtlMinutes <= 0)
+    {
+        throw new InvalidOperationException("JWT access token ttl minutes must be a valid positive integer.");
+    }
+
+    return new AuthCookieOptions(cookieName, webBaseUrl.TrimEnd('/'), accessTokenTtlMinutes);
+}
