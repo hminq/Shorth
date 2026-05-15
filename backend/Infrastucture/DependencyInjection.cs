@@ -28,6 +28,7 @@ public static class DependencyInjection
         var googleAuthOptions = ReadGoogleAuthOptions(configuration);
         var emailOptions = ReadEmailOptions(configuration);
         var jwtOptions = ReadJwtOptions(configuration);
+        var turnstileOptions = ReadTurnstileOptions(configuration);
 
         services.AddSingleton(databaseOptions);
         services.AddSingleton(redisOptions);
@@ -38,6 +39,7 @@ public static class DependencyInjection
         services.AddSingleton(googleAuthOptions);
         services.AddSingleton(emailOptions);
         services.AddSingleton(jwtOptions);
+        services.AddSingleton(turnstileOptions);
 
         services
             .AddDatabase(databaseOptions)
@@ -115,6 +117,7 @@ public static class DependencyInjection
                 TimeSpan.FromHours(provider.GetRequiredService<RedisOptions>().LinkDestinationUrlTtlHours)));
         services.AddScoped<ISlugGenerator, SlugGenerator>();
         services.AddScoped<IClickEventQueue, SqsClickEventQueue>();
+        services.AddHttpClient<ICaptchaVerifier, CloudflareTurnstileVerifier>();
 
         return services;
     }
@@ -219,6 +222,12 @@ public static class DependencyInjection
                 "JWT_ACCESS_TOKEN_TTL_MINUTES",
                 "JWT access token ttl minutes is not configured.",
                 "JWT access token ttl minutes must be a valid positive integer."));
+    }
+
+    private static TurnstileOptions ReadTurnstileOptions(IConfiguration configuration)
+    {
+        return new TurnstileOptions(
+            Required(configuration, "TURNSTILE_SECRET_KEY", "Turnstile secret key is not configured."));
     }
 
     private static string Required(

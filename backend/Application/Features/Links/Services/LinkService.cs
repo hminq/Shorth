@@ -14,17 +14,20 @@ public sealed class LinkService
     private readonly ILinkCacheRepository _linkCacheRepository;
     private readonly IClickEventQueue _clickEventQueue;
     private readonly ISlugGenerator _slugGenerator;
+    private readonly ICaptchaVerifier _captchaVerifier;
 
     public LinkService(
         ILinkRepository linkRepository,
         ILinkCacheRepository linkCacheRepository,
         IClickEventQueue clickEventQueue,
-        ISlugGenerator slugGenerator)
+        ISlugGenerator slugGenerator,
+        ICaptchaVerifier captchaVerifier)
     {
         _linkRepository = linkRepository;
         _linkCacheRepository = linkCacheRepository;
         _clickEventQueue = clickEventQueue;
         _slugGenerator = slugGenerator;
+        _captchaVerifier = captchaVerifier;
     }
 
     public async Task<CreateLinkResult> CreateShortLinkAsync(CreateLinkRequest request, CancellationToken ct = default)
@@ -32,6 +35,19 @@ public sealed class LinkService
         if (string.IsNullOrWhiteSpace(request.DestinationUrl))
         {
             throw new ArgumentException("Destination url is required.", nameof(request));
+        }
+
+        if (request.OwnerId is null)
+        {
+            if (string.IsNullOrWhiteSpace(request.CaptchaToken))
+            {
+                throw new ArgumentException("Human verification is required.", nameof(request));
+            }
+
+            if (!await _captchaVerifier.VerifyAsync(request.CaptchaToken, ct))
+            {
+                throw new ArgumentException("Human verification failed. Please try again.", nameof(request));
+            }
         }
 
         var createdAt = DateTime.UtcNow;

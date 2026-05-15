@@ -9,4 +9,6 @@ public sealed class CreateLinkHttpRequest
     public string DestinationUrl { get; init; } = default!;
 
     public DateTime? ExpiresAt { get; init; }
+
+    public string? CaptchaToken { get; init; }
 }

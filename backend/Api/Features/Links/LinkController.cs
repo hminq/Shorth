@@ -97,7 +97,8 @@ namespace Api.Features.Links
             return new CreateLinkRequest(
                 GetOptionalCurrentUserId(),
                 request.DestinationUrl,
-                request.ExpiresAt
+                request.ExpiresAt,
+                request.CaptchaToken
             );
         }
 
