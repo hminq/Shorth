@@ -49,10 +49,13 @@ const benefits: Benefit[] = [
 
 export function Benefits() {
   return (
-    <section className="benefits" aria-label="Shorth benefits">
-      {benefits.map(({ icon: BenefitIcon, title, body }) => (
+    <section id="features" className="benefits" aria-label="Shorth features">
+      {benefits.map(({ icon: BenefitIcon, title, body }, index) => (
         <article className="benefit-card" key={title}>
-          <BenefitIcon className="ph-icon" weight="regular" />
+          <div className="benefit-kicker">
+            <span className="benefit-index">{String(index + 1).padStart(2, '0')}</span>
+            <BenefitIcon className="ph-icon" weight="bold" />
+          </div>
           <h2>{title}</h2>
           <p>{body}</p>
         </article>
