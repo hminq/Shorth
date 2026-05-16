@@ -1,10 +1,37 @@
 import { Button } from './Button'
-import { getAuthSession, logout } from '../lib/api'
-import { useState } from 'react'
+import { fetchMe, getAuthSession, logout, saveProfileSession, type AuthSession } from '../lib/api'
+import { useEffect, useState } from 'react'
 
 export function Header() {
-  const session = getAuthSession()
+  const [session, setSession] = useState<AuthSession | null>(() => getAuthSession())
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+
+  useEffect(() => {
+    if (session) {
+      return
+    }
+
+    async function syncProfile() {
+      try {
+        const profile = await fetchMe()
+        saveProfileSession(profile)
+        setSession(profile)
+      } catch {
+        setSession(null)
+      }
+    }
+
+    void syncProfile()
+  }, [session])
+
+  useEffect(() => {
+    function handleSessionUpdate(event: Event) {
+      setSession((event as CustomEvent<AuthSession>).detail)
+    }
+
+    window.addEventListener('shorth:auth-session-updated', handleSessionUpdate)
+    return () => window.removeEventListener('shorth:auth-session-updated', handleSessionUpdate)
+  }, [])
 
   async function handleLogout() {
     try {
@@ -31,13 +58,20 @@ export function Header() {
             >
               <span className="user-name">{session.displayName}</span>
               <span className="user-avatar" aria-hidden="true">
-                {getInitials(session.displayName)}
+                {session.avatarUrl ? (
+                  <img src={session.avatarUrl} alt="" />
+                ) : (
+                  getInitials(session.displayName)
+                )}
               </span>
             </button>
             {isMenuOpen && (
               <div className="user-menu-panel" role="menu">
-                <a href="/dashboard" role="menuitem">
-                  Dashboard
+                <a href="/profile" role="menuitem">
+                  Profile
+                </a>
+                <a href="/links" role="menuitem">
+                  My links
                 </a>
                 <button className="user-menu-signout" type="button" role="menuitem" onClick={() => void handleLogout()}>
                   Sign out

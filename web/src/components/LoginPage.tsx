@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react'
-import { getGoogleLoginUrl, loginLocal, saveAuthSession } from '../lib/api'
+import { fetchMe, getGoogleLoginUrl, loginLocal, saveProfileSession } from '../lib/api'
 import { Button } from './Button'
 import { Footer } from './Footer'
 import { Header } from './Header'
+import { Eye, EyeSlash } from '@phosphor-icons/react'
 
 type LoginState =
   | { status: 'idle' }
@@ -12,6 +13,7 @@ type LoginState =
 
 export function LoginPage() {
   const [state, setState] = useState<LoginState>({ status: 'idle' })
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false)
 
   async function handleLocalLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -28,8 +30,8 @@ export function LoginPage() {
     setState({ status: 'loading', message: 'Signing in...' })
 
     try {
-      const session = await loginLocal(email, password)
-      saveAuthSession(session)
+      await loginLocal(email, password)
+      saveProfileSession(await fetchMe())
       window.location.href = '/'
     } catch (error) {
       setState({
@@ -72,7 +74,23 @@ export function LoginPage() {
             <label className="field-label" htmlFor="password">
               Password <span>*</span>
             </label>
-            <input id="password" name="password" type="password" autoComplete="current-password" required />
+            <div className="password-control">
+              <input
+                id="password"
+                name="password"
+                type={isPasswordVisible ? 'text' : 'password'}
+                autoComplete="current-password"
+                required
+              />
+              <button
+                className="password-toggle"
+                type="button"
+                aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
+                onClick={() => setIsPasswordVisible(current => !current)}
+              >
+                {isPasswordVisible ? <EyeSlash weight="bold" /> : <Eye weight="bold" />}
+              </button>
+            </div>
 
             <Button type="submit" disabled={state.status === 'loading'}>
               Sign in
