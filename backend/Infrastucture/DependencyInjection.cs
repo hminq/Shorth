@@ -3,6 +3,7 @@ using Amazon.S3;
 using Amazon.SQS;
 using Application.Features.Auth.Interfaces;
 using Application.Features.Links.Interfaces;
+using Application.Features.Upload.Interfaces;
 using Domain.Features.Auth.Enums;
 using Infrastucture.Configurations;
 using Infrastucture.Database;
@@ -47,7 +48,8 @@ public static class DependencyInjection
             .AddAwsClients(awsOptions)
             .AddEmailInfrastructure(resendOptions)
             .AddLinkInfrastructure()
-            .AddAuthInfrastructure();
+            .AddAuthInfrastructure()
+            .AddUploadInfrastructure();
 
         return services;
     }
@@ -142,6 +144,13 @@ public static class DependencyInjection
         return services;
     }
 
+    private static IServiceCollection AddUploadInfrastructure(this IServiceCollection services)
+    {
+        services.AddScoped<IUploadPresignService, S3UploadPresignService>();
+
+        return services;
+    }
+
     private static DatabaseOptions ReadDatabaseOptions(IConfiguration configuration)
     {
         return new DatabaseOptions(
@@ -176,7 +185,8 @@ public static class DependencyInjection
     private static S3Options ReadS3Options(IConfiguration configuration)
     {
         return new S3Options(
-            Required(configuration, "S3_BUCKET_NAME", "S3 bucket name is not configured."));
+            Required(configuration, "S3_BUCKET_NAME", "S3 bucket name is not configured."),
+            Required(configuration, "S3_PUBLIC_BASE_URL", "S3 public base url is not configured."));
     }
 
     private static ResendOptions ReadResendOptions(IConfiguration configuration)
