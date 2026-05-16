@@ -51,4 +51,22 @@ public sealed class UserRepository : IUserRepository
             throw new InvalidOperationException("Failed to update user.", ex);
         }
     }
+
+    public async Task UpdateWithNewIdentityAsync(User user, UserIdentity identity, CancellationToken ct = default)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
+
+        try
+        {
+            _dbContext.Users.Update(user);
+            await _dbContext.UserIdentities.AddAsync(identity, ct);
+            await _dbContext.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+        }
+        catch (DbUpdateException ex)
+        {
+            await transaction.RollbackAsync(ct);
+            throw new InvalidOperationException("Failed to update user with identity.", ex);
+        }
+    }
 }
