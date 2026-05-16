@@ -5,6 +5,8 @@ using Infrastucture;
 using Api.HealthChecks;
 using Application.Features.Auth.Services;
 using Application.Features.Links.Services;
+using Application.Features.Profile.Services;
+using Application.Features.Upload.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
@@ -33,21 +35,18 @@ builder.Services.AddCors(options =>
 });
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+    .AddJwtBearer();
+builder.Services
+    .AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+    .Configure<JwtOptions, AuthCookieOptions>((options, jwtOptions, cookieOptions) =>
     {
-        var signingKey = builder.Configuration["JWT_SIGNING_KEY"];
-        if (string.IsNullOrWhiteSpace(signingKey))
-        {
-            throw new InvalidOperationException("JWT signing key is not configured.");
-        }
-
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = false,
             ValidateAudience = false,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SigningKey)),
             ClockSkew = TimeSpan.FromMinutes(1)
         };
         options.Events = new JwtBearerEvents
@@ -55,7 +54,7 @@ builder.Services
             OnMessageReceived = context =>
             {
                 if (string.IsNullOrWhiteSpace(context.Token)
-                    && context.Request.Cookies.TryGetValue(authCookieOptions.CookieName, out var cookieToken))
+                    && context.Request.Cookies.TryGetValue(cookieOptions.CookieName, out var cookieToken))
                 {
                     context.Token = cookieToken;
                 }
@@ -73,6 +72,8 @@ builder.Services.AddHealthChecks()
     .AddCheck<ResendHealthCheck>("resend");
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<LinkService>();
+builder.Services.AddScoped<ProfileService>();
+builder.Services.AddScoped<UploadService>();
 
 var app = builder.Build();
 

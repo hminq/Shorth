@@ -22,104 +22,105 @@ public sealed class GlobalExceptionHandler(
             AccountDisableException => new ProblemDetails
             {
                 Title = "Account disabled",
-                Detail = exception.Message,
+                Detail = "This account is disabled.",
                 Status = StatusCodes.Status403Forbidden
             },
-            WrongCredentialsException => new ProblemDetails
-            {
-                Title = "Wrong credentials",
-                Detail = exception.Message,
-                Status = StatusCodes.Status401Unauthorized
-            },
+            WrongCredentialsException => CreateWrongCredentialsProblem(httpContext),
             AlternateSignInRequiredException => new ProblemDetails
             {
                 Title = "Alternate sign-in required",
-                Detail = exception.Message,
+                Detail = "Use the sign-in method already linked to this email address.",
                 Status = StatusCodes.Status409Conflict
             },
             EmailVerificationPendingException => new ProblemDetails
             {
                 Title = "Email verification pending",
-                Detail = exception.Message,
+                Detail = "A verification code has already been sent. Please check your email.",
                 Status = StatusCodes.Status409Conflict
             },
             EmailVerificationRequiredException => new ProblemDetails
             {
                 Title = "Email verification required",
-                Detail = exception.Message,
+                Detail = "Verify your email before continuing.",
                 Status = StatusCodes.Status409Conflict
             },
             EmailVerificationNotPendingException => new ProblemDetails
             {
                 Title = "Email verification not pending",
-                Detail = exception.Message,
+                Detail = "There is no active email verification for this account.",
                 Status = StatusCodes.Status409Conflict
             },
             EmailAlreadyVerifiedException => new ProblemDetails
             {
                 Title = "Email already verified",
-                Detail = exception.Message,
+                Detail = "This email address is already verified.",
                 Status = StatusCodes.Status409Conflict
             },
             EmailAlreadyExistedException => new ProblemDetails
             {
                 Title = "Email already exists",
-                Detail = exception.Message,
+                Detail = "This email address already has an account.",
                 Status = StatusCodes.Status409Conflict
             },
             InvalidGoogleAuthStateException => new ProblemDetails
             {
                 Title = "Invalid Google auth state",
-                Detail = exception.Message,
+                Detail = "Could not finish Google sign-in. Please try again.",
                 Status = StatusCodes.Status400BadRequest
             },
             GoogleEmailUnavailableException => new ProblemDetails
             {
                 Title = "Google email unavailable",
-                Detail = exception.Message,
+                Detail = "Google did not provide a verified email address.",
                 Status = StatusCodes.Status409Conflict
             },
             OtpResendTooSoonException => new ProblemDetails
             {
                 Title = "Otp resend too soon",
-                Detail = exception.Message,
+                Detail = "Please wait before requesting another code.",
                 Status = StatusCodes.Status429TooManyRequests
             },
             VerificationOtpInactiveException => new ProblemDetails
             {
                 Title = "Verification code inactive",
-                Detail = exception.Message,
+                Detail = "This verification code is no longer valid. Request a new one.",
                 Status = StatusCodes.Status409Conflict
             },
             OtpMaxAttemptsExceededException => new ProblemDetails
             {
                 Title = "Otp max attempts exceeded",
-                Detail = exception.Message,
+                Detail = "Too many attempts. Request a new verification code.",
                 Status = StatusCodes.Status409Conflict
             },
             WrongOtpException => new ProblemDetails
             {
                 Title = "Wrong otp",
-                Detail = exception.Message,
+                Detail = "The verification code is incorrect.",
                 Status = StatusCodes.Status400BadRequest
             },
             DomainException => new ProblemDetails
             {
-                Title = "Business rule violation",
-                Detail = exception.Message,
+                Title = "Invalid request",
+                Detail = "Check the request and try again.",
                 Status = StatusCodes.Status400BadRequest
             },
             ArgumentException => new ProblemDetails
             {
                 Title = "Invalid request",
-                Detail = exception.Message,
+                Detail = "Check the fields and try again.",
                 Status = StatusCodes.Status400BadRequest
             },
             InvalidOperationException => new ProblemDetails
             {
                 Title = "Operation failed",
-                Detail = exception.Message,
+                Detail = "Could not complete the request. Please try again.",
                 Status = StatusCodes.Status400BadRequest
+            },
+            UnauthorizedAccessException => new ProblemDetails
+            {
+                Title = "Invalid session",
+                Detail = "Please sign in again to continue.",
+                Status = StatusCodes.Status401Unauthorized
             },
             _ => new ProblemDetails
             {
@@ -133,5 +134,26 @@ public sealed class GlobalExceptionHandler(
 
         await httpContext.Response.WriteAsJsonAsync(problemDetails, ct);
         return true;
+    }
+
+    private static ProblemDetails CreateWrongCredentialsProblem(HttpContext httpContext)
+    {
+        var path = httpContext.Request.Path;
+        if (path.StartsWithSegments("/api/login"))
+        {
+            return new ProblemDetails
+            {
+                Title = "Sign-in failed",
+                Detail = "Email or password is incorrect.",
+                Status = StatusCodes.Status401Unauthorized
+            };
+        }
+
+        return new ProblemDetails
+        {
+            Title = "Current password incorrect",
+            Detail = "Current password is incorrect.",
+            Status = StatusCodes.Status401Unauthorized
+        };
     }
 }

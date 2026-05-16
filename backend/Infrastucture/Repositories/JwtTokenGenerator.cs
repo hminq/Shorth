@@ -11,8 +11,6 @@ namespace Infrastucture.Repositories;
 public sealed class JwtTokenGenerator : IJwtTokenGenerator
 {
     private const string UserIdClaim = "user_id";
-    private const string EmailClaim = "email";
-    private const string DisplayNameClaim = "display_name";
 
     private readonly byte[] _signingKeyBytes;
     private readonly TimeSpan _accessTokenTtl;
@@ -42,16 +40,6 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
         {
             new(UserIdClaim, user.Id.ToString())
         };
-
-        if (!string.IsNullOrWhiteSpace(user.Email))
-        {
-            claims.Add(new Claim(EmailClaim, user.Email));
-        }
-
-        if (!string.IsNullOrWhiteSpace(user.DisplayName))
-        {
-            claims.Add(new Claim(DisplayNameClaim, user.DisplayName));
-        }
 
         var descriptor = new SecurityTokenDescriptor
         {
