@@ -18,6 +18,7 @@ public class LinkClickEvent
     private LinkClickEvent() {}
 
     public static LinkClickEvent Create(
+        Guid id,
         Guid linkId,
         DateTime clickedAt,
         string? userAgent,
@@ -29,6 +30,11 @@ public class LinkClickEvent
         string? osFamily
     )
     {
+        if (id == Guid.Empty)
+        {
+            throw new ArgumentException("Click event id is required.", nameof(id));
+        }
+
         if (linkId == Guid.Empty)
         {
             throw new ArgumentException("Link id is required.", nameof(linkId));
@@ -36,7 +42,7 @@ public class LinkClickEvent
 
         return new LinkClickEvent
         {
-            Id = Guid.NewGuid(),
+            Id = id,
             LinkId = linkId,
             ClickedAt = clickedAt,
             UserAgent = string.IsNullOrWhiteSpace(userAgent) ? null : userAgent,

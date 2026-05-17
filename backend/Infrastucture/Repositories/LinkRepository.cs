@@ -64,8 +64,13 @@ public class LinkRepository : ILinkRepository
             .ToListAsync(ct);
     }
 
-    public Task IncrementClickCountAsync(Guid linkId, DateTime clickedAt, CancellationToken ct = default)
+    public async Task IncrementClickCountAsync(Guid linkId, DateTime clickedAt, CancellationToken ct = default)
     {
-        throw new NotImplementedException();
+        await _dbContext.Links
+            .Where(x => x.Id == linkId)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.ClickCount, x => x.ClickCount + 1)
+                .SetProperty(x => x.LastClickedAt, clickedAt)
+                .SetProperty(x => x.UpdatedAt, clickedAt), ct);
     }
 }

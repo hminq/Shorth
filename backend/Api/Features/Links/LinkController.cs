@@ -3,7 +3,10 @@ using Application.Features.Links.Dtos;
 using Application.Features.Links.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Globalization;
+using System.Security.Cryptography;
 using System.Security.Claims;
+using System.Text;
 
 namespace Api.Features.Links
 {
@@ -55,6 +58,32 @@ namespace Api.Features.Links
             return Ok(ToHttpResponse(result));
         }
 
+        [Authorize]
+        [HttpGet("{id:guid}/analytics")]
+        public async Task<ActionResult<LinkAnalyticsHttpResponse>> GetLinkAnalytics(
+            [FromRoute] Guid id,
+            [FromQuery] string? from,
+            [FromQuery] string? to,
+            CancellationToken ct)
+        {
+            var userId = GetCurrentUserId();
+            var result = await _linkService.GetLinkAnalyticsAsync(
+                new GetLinkAnalyticsRequest(userId, id, ParseDate(from), ParseDate(to)),
+                ct);
+
+            if (result is null)
+            {
+                return NotFound(new ProblemDetails
+                {
+                    Title = "Link not found",
+                    Detail = "The link does not exist.",
+                    Status = StatusCodes.Status404NotFound
+                });
+            }
+
+            return Ok(ToHttpResponse(result));
+        }
+
         [HttpPost]
         public async Task<ActionResult<CreateLinkHttpResponse>> CreateNewLink(
             [FromBody] CreateLinkHttpRequest request, 
@@ -75,7 +104,7 @@ namespace Api.Features.Links
             [FromRoute] string slug,
             CancellationToken ct)
         {
-            var serviceRequest = ToServiceRequest(slug);
+            var serviceRequest = ToServiceRequestWithMetadata(slug);
 
             var result = await _linkService.ResolveShortLinkAsync(serviceRequest, ct);
 
@@ -102,9 +131,60 @@ namespace Api.Features.Links
             );
         }
 
-        private static ResolveLinkRequest ToServiceRequest(string slug)
+        private ResolveLinkRequest ToServiceRequestWithMetadata(string slug)
         {
-            return new ResolveLinkRequest(slug);
+            return new ResolveLinkRequest(
+                slug,
+                NormalizeHeader(Request.Headers["User-Agent"].ToString(), 512),
+                NormalizeHeader(Request.Headers["Referer"].ToString(), 512),
+                HashIpAddress(GetClientIpAddress()),
+                NormalizeCountryCode(Request.Headers["CF-IPCountry"].ToString()));
+        }
+
+        private string? GetClientIpAddress()
+        {
+            var forwardedFor = Request.Headers["X-Forwarded-For"].ToString();
+            if (!string.IsNullOrWhiteSpace(forwardedFor))
+            {
+                return forwardedFor
+                    .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                    .FirstOrDefault();
+            }
+
+            return HttpContext.Connection.RemoteIpAddress?.ToString();
+        }
+
+        private static string? HashIpAddress(string? ipAddress)
+        {
+            if (string.IsNullOrWhiteSpace(ipAddress))
+            {
+                return null;
+            }
+
+            var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(ipAddress.Trim()));
+            return Convert.ToHexString(bytes).ToLowerInvariant();
+        }
+
+        private static string? NormalizeHeader(string? value, int maxLength)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            var trimmed = value.Trim();
+            return trimmed.Length <= maxLength ? trimmed : trimmed[..maxLength];
+        }
+
+        private static string? NormalizeCountryCode(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            var trimmed = value.Trim().ToUpperInvariant();
+            return trimmed.Length == 2 && trimmed.All(static c => c is >= 'A' and <= 'Z') ? trimmed : null;
         }
 
         private Guid GetCurrentUserId()
@@ -130,7 +210,41 @@ namespace Api.Features.Links
 
         private static int ParsePage(string? page)
         {
-            return int.TryParse(page, out var parsed) && parsed > 0 ? parsed : 1;
+            if (string.IsNullOrWhiteSpace(page))
+            {
+                return 1;
+            }
+
+            if (!int.TryParse(
+                    page,
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out var parsed) || parsed < 1)
+            {
+                throw new ArgumentException("Page must be a positive integer.", nameof(page));
+            }
+
+            return parsed;
+        }
+
+        private static DateOnly? ParseDate(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            if (!DateOnly.TryParseExact(
+                    value,
+                    "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out var parsed))
+            {
+                throw new ArgumentException("Date must use yyyy-MM-dd format.", nameof(value));
+            }
+
+            return parsed;
         }
 
         private static CreateLinkHttpResponse ToHttpResponse(CreateLinkResult result) {
@@ -174,6 +288,28 @@ namespace Api.Features.Links
                 result.UpdatedAt,
                 result.ExpiresAt,
                 result.IsDisabled);
+        }
+
+        private static LinkAnalyticsHttpResponse ToHttpResponse(LinkAnalyticsResult result)
+        {
+            return new LinkAnalyticsHttpResponse(
+                result.LinkId,
+                result.TotalClicks,
+                result.LastClickedAt,
+                result.From,
+                result.To,
+                result.Daily
+                    .Select(item => new LinkDailyAnalyticsHttpResponse(
+                        item.Date,
+                        item.Clicks,
+                        item.UniqueVisitors))
+                    .ToList(),
+                result.TopCountries
+                    .Select(item => new LinkCountryAnalyticsHttpResponse(
+                        item.CountryCode,
+                        item.Clicks,
+                        item.Percent))
+                    .ToList());
         }
     }
 }

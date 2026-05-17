@@ -1,9 +1,9 @@
-using System;
+using Application.Features.Links.Dtos;
 
 namespace Application.Features.Links.Interfaces;
 
 public interface ILinkCacheRepository
 {
-    Task<string?> GetDestinationUrlBySlugAsync(string slug, CancellationToken ct = default);
-    Task SetDestinationUrlBySlugAsync(string slug, string destinationUrl, CancellationToken ct = default);
+    Task<LinkCacheEntry?> GetBySlugAsync(string slug, CancellationToken ct = default);
+    Task SetBySlugAsync(string slug, LinkCacheEntry entry, CancellationToken ct = default);
 }

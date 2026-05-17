@@ -9,8 +9,12 @@ namespace Application.Features.Links.Services;
 public sealed class LinkService
 {
     private const int MaxPageSize = 10;
+    private const int DefaultAnalyticsWindowDays = 30;
+    private const int MaxAnalyticsWindowDays = 366;
+    private const int TopCountriesLimit = 3;
 
     private readonly ILinkRepository _linkRepository;
+    private readonly ILinkClickEventRepository _linkClickEventRepository;
     private readonly ILinkCacheRepository _linkCacheRepository;
     private readonly IClickEventQueue _clickEventQueue;
     private readonly ISlugGenerator _slugGenerator;
@@ -18,12 +22,14 @@ public sealed class LinkService
 
     public LinkService(
         ILinkRepository linkRepository,
+        ILinkClickEventRepository linkClickEventRepository,
         ILinkCacheRepository linkCacheRepository,
         IClickEventQueue clickEventQueue,
         ISlugGenerator slugGenerator,
         ICaptchaVerifier captchaVerifier)
     {
         _linkRepository = linkRepository;
+        _linkClickEventRepository = linkClickEventRepository;
         _linkCacheRepository = linkCacheRepository;
         _clickEventQueue = clickEventQueue;
         _slugGenerator = slugGenerator;
@@ -152,6 +158,58 @@ public sealed class LinkService
             link.IsDisabled);
     }
 
+    public async Task<LinkAnalyticsResult?> GetLinkAnalyticsAsync(GetLinkAnalyticsRequest request, CancellationToken ct = default)
+    {
+        if (request.UserId == Guid.Empty)
+        {
+            throw new ArgumentException("User id is required.", nameof(request));
+        }
+
+        if (request.LinkId == Guid.Empty)
+        {
+            throw new ArgumentException("Link id is required.", nameof(request));
+        }
+
+        var link = await _linkRepository.GetByIdAsync(request.LinkId, ct);
+        if (link is null || link.OwnerId != request.UserId)
+        {
+            return null;
+        }
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var from = request.From ?? today.AddDays(-(DefaultAnalyticsWindowDays - 1));
+        var to = request.To ?? today;
+
+        if (from > to)
+        {
+            throw new ArgumentException("Analytics start date must be before end date.", nameof(request));
+        }
+
+        if (to.DayNumber - from.DayNumber + 1 > MaxAnalyticsWindowDays)
+        {
+            throw new ArgumentException($"Analytics range cannot be longer than {MaxAnalyticsWindowDays} days.", nameof(request));
+        }
+
+        var fromDateTime = DateTime.SpecifyKind(from.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+        var toExclusive = DateTime.SpecifyKind(to.AddDays(1).ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+        var daily = await _linkClickEventRepository.GetDailyAnalyticsAsync(link.Id, from, to, ct);
+        var topCountries = await _linkClickEventRepository.GetTopCountriesAsync(
+            link.Id,
+            fromDateTime,
+            toExclusive,
+            TopCountriesLimit,
+            ct);
+
+        return new LinkAnalyticsResult(
+            link.Id,
+            link.ClickCount,
+            link.LastClickedAt,
+            from,
+            to,
+            daily,
+            topCountries);
+    }
+
     public async Task<ResolveLinkResult> ResolveShortLinkAsync(ResolveLinkRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Slug))
@@ -164,11 +222,20 @@ public sealed class LinkService
             throw new ArgumentException($"Slug must be {SlugRules.SlugLength} characters long.", nameof(request));
         }
 
-        var cachedDestinationUrl = await _linkCacheRepository.GetDestinationUrlBySlugAsync(request.Slug, ct);
+        var cachedLink = await _linkCacheRepository.GetBySlugAsync(request.Slug, ct);
 
-        if (cachedDestinationUrl != null)
+        if (cachedLink != null)
         {
-            return new ResolveLinkResult(cachedDestinationUrl);
+            await _clickEventQueue.EnqueueAsync(
+                cachedLink.LinkId,
+                DateTime.UtcNow,
+                request.UserAgent,
+                request.Referrer,
+                request.IpHash,
+                request.CountryCode,
+                ct);
+
+            return new ResolveLinkResult(cachedLink.DestinationUrl);
         }
 
         var link = await _linkRepository.GetBySlugAsync(request.Slug, ct);
@@ -185,7 +252,21 @@ public sealed class LinkService
                 throw new InvalidLinkStateException("The link is expired.");
             }
 
-            await _linkCacheRepository.SetDestinationUrlBySlugAsync(link.Slug, link.DestinationUrl, ct);
+            var clickedAt = DateTime.UtcNow;
+
+            await _linkCacheRepository.SetBySlugAsync(
+                link.Slug,
+                new LinkCacheEntry(link.Id, link.DestinationUrl),
+                ct);
+
+            await _clickEventQueue.EnqueueAsync(
+                link.Id,
+                clickedAt,
+                request.UserAgent,
+                request.Referrer,
+                request.IpHash,
+                request.CountryCode,
+                ct);
 
             return new ResolveLinkResult(link.DestinationUrl);
         }
