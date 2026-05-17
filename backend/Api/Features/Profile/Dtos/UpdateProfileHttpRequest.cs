@@ -4,7 +4,7 @@ namespace Api.Features.Profile.Dtos;
 
 public sealed class UpdateProfileHttpRequest : IValidatableObject
 {
-    private const string PasswordRegex = @"^(?=.*[A-Z])(?=.*[a-z])(?=.*(?:\d|[^A-Za-z0-9]))\S+$";
+    private const string PasswordRegex = @"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z0-9])\S+$";
     private string? _displayName;
     private string? _avatarUrl;
 
@@ -28,7 +28,7 @@ public sealed class UpdateProfileHttpRequest : IValidatableObject
     [StringLength(72, MinimumLength = 8, ErrorMessage = "Password must be between 8 and 72 characters.")]
     [RegularExpression(
         PasswordRegex,
-        ErrorMessage = "Password must contain at least one uppercase letter, one lowercase letter, and one number or special character, with no whitespace.")]
+        ErrorMessage = "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character, with no whitespace.")]
     public string? NewPassword { get; init; }
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)

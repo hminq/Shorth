@@ -288,20 +288,19 @@ public sealed class AuthService
                     refreshedAt.Add(OtpRules.EmailVerificationTtl));
                 refreshedEmailVerificationOtp.MarkSent(refreshedAt);
 
+                var refreshedEmailJob = new EmailJobMessage(
+                    EmailJobType.VerifyEmail,
+                    foundUser.Id,
+                    email,
+                    foundUser.DisplayName,
+                    refreshedOtpCode,
+                    DateTime.UtcNow);
+
                 await _localRegistrationRepository.RefreshPendingVerificationAsync(
                     foundUser,
                     foundLocalIdentity,
                     refreshedEmailVerificationOtp,
-                    ct);
-
-                await _emailJobQueue.EnqueueAsync(
-                    new EmailJobMessage(
-                        EmailJobType.VerifyEmail,
-                        foundUser.Id,
-                        email,
-                        foundUser.DisplayName,
-                        refreshedOtpCode,
-                        DateTime.UtcNow),
+                    refreshedEmailJob,
                     ct);
 
                 return new RegisterResult(
@@ -340,17 +339,15 @@ public sealed class AuthService
             createdAt.Add(OtpRules.EmailVerificationTtl));
         emailVerificationOtp.MarkSent(createdAt);
 
-        await _localRegistrationRepository.CreateAsync(user, localIdentity, emailVerificationOtp, ct);
+        var emailJob = new EmailJobMessage(
+            EmailJobType.VerifyEmail,
+            user.Id,
+            email,
+            user.DisplayName,
+            otpCode,
+            DateTime.UtcNow);
 
-        await _emailJobQueue.EnqueueAsync(
-            new EmailJobMessage(
-                EmailJobType.VerifyEmail,
-                user.Id,
-                email,
-                user.DisplayName,
-                otpCode,
-                DateTime.UtcNow),
-            ct);
+        await _localRegistrationRepository.CreateAsync(user, localIdentity, emailVerificationOtp, emailJob, ct);
 
         return new RegisterResult(
             user.Id,

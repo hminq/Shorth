@@ -2,6 +2,7 @@ using Api.Configurations;
 using Api.Features.Auth.Dtos;
 using Application.Features.Auth.Dtos;
 using Application.Features.Auth.Services;
+using Domain.Features.Auth.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Features.Auth
@@ -55,12 +56,27 @@ namespace Api.Features.Auth
             [FromQuery] string? state,
             CancellationToken ct)
         {
-            var loginResult = await _authService.GoogleLoginAsync(
-                new GoogleLoginRequest(code, state),
-                ct);
-            SetAccessTokenCookie(loginResult.AccessToken);
+            try
+            {
+                var loginResult = await _authService.GoogleLoginAsync(
+                    new GoogleLoginRequest(code, state),
+                    ct);
+                SetAccessTokenCookie(loginResult.AccessToken);
 
-            return Redirect($"{_authCookieOptions.WebBaseUrl}/auth/callback");
+                return Redirect($"{_authCookieOptions.WebBaseUrl}/auth/callback");
+            }
+            catch (GoogleEmailUnavailableException)
+            {
+                return RedirectWithGoogleError(
+                    "google_email_unverified",
+                    "Your Google account email is not verified. Verify it with Google or sign up with email instead.");
+            }
+            catch (InvalidGoogleAuthStateException)
+            {
+                return RedirectWithGoogleError(
+                    "google_state_invalid",
+                    "Could not finish Google sign-in. Please try again.");
+            }
         }
 
         [HttpPost("~/api/logout")]
@@ -107,6 +123,12 @@ namespace Api.Features.Auth
                     Path = "/",
                     Expires = DateTimeOffset.UtcNow.AddMinutes(_authCookieOptions.AccessTokenTtlMinutes)
                 });
+        }
+
+        private RedirectResult RedirectWithGoogleError(string code, string message)
+        {
+            return Redirect(
+                $"{_authCookieOptions.WebBaseUrl}/auth/callback?error={Uri.EscapeDataString(code)}&message={Uri.EscapeDataString(message)}");
         }
     }
 }
