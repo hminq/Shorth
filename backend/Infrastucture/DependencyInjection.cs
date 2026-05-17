@@ -3,8 +3,10 @@ using Amazon.S3;
 using Amazon.SQS;
 using Application.Features.Auth.Interfaces;
 using Application.Features.Links.Interfaces;
+using Application.Features.Outbox.Interfaces;
 using Application.Features.Upload.Interfaces;
 using Domain.Features.Auth.Enums;
+using Domain.Features.Outbox.Enums;
 using Infrastucture.Configurations;
 using Infrastucture.Database;
 using Infrastucture.Repositories;
@@ -64,6 +66,8 @@ public static class DependencyInjection
                 npgsqlOptions.MapEnum<IdentityProvider>("identity_provider");
                 npgsqlOptions.MapEnum<UserStatus>("user_status");
                 npgsqlOptions.MapEnum<OtpPurpose>("otp_purpose");
+                npgsqlOptions.MapEnum<OutboxMessageType>("outbox_message_type");
+                npgsqlOptions.MapEnum<OutboxMessageStatus>("outbox_message_status");
             }));
 
         return services;
@@ -113,6 +117,7 @@ public static class DependencyInjection
     private static IServiceCollection AddLinkInfrastructure(this IServiceCollection services)
     {
         services.AddScoped<ILinkRepository, LinkRepository>();
+        services.AddScoped<ILinkClickEventRepository, LinkClickEventRepository>();
         services.AddScoped<ILinkCacheRepository>(provider =>
             new LinkCacheRepository(
                 provider.GetRequiredService<IDistributedCache>(),
@@ -140,6 +145,7 @@ public static class DependencyInjection
         services.AddScoped<IEmailJobQueue, SqsEmailJobQueue>();
         services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+        services.AddScoped<IOutboxRepository, OutboxRepository>();
 
         return services;
     }

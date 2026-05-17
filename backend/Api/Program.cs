@@ -9,6 +9,7 @@ using Application.Features.Profile.Services;
 using Application.Features.Upload.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
@@ -19,6 +20,15 @@ await builder.Configuration.AddSecretsIfProductionAsync(builder.Environment.IsPr
 builder.Services.AddControllers();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
+                               | ForwardedHeaders.XForwardedProto
+                               | ForwardedHeaders.XForwardedHost;
+    
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 builder.Services.AddInfrastructure(builder.Configuration);
 var authCookieOptions = ReadAuthCookieOptions(builder.Configuration, builder.Environment.IsProduction());
 builder.Services.AddSingleton(authCookieOptions);
@@ -79,6 +89,7 @@ var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 
+app.UseForwardedHeaders();
 app.UseExceptionHandler();
 app.UseHttpsRedirection();
 
