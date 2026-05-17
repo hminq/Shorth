@@ -15,6 +15,13 @@ export type LoginResponse = {
   displayName: string
 }
 
+export type RegisterResponse = {
+  userId: string
+  email: string
+  displayName: string
+  requiresEmailVerification: boolean
+}
+
 export type AuthSession = {
   userId: string
   email: string
@@ -68,8 +75,41 @@ export type UserLinksResponse = {
   items: UserLinkSummary[]
 }
 
+export type LinkDailyAnalytics = {
+  date: string
+  clicks: number
+  uniqueVisitors: number
+}
+
+export type LinkCountryAnalytics = {
+  countryCode: string
+  clicks: number
+  percent: number
+}
+
+export type LinkAnalyticsResponse = {
+  linkId: string
+  totalClicks: number
+  lastClickedAt: string | null
+  from: string
+  to: string
+  daily: LinkDailyAnalytics[]
+  topCountries: LinkCountryAnalytics[]
+}
+
 type GoogleLoginUrlResponse = {
   authorizationUrl: string
+}
+
+type VerifyEmailOtpResponse = {
+  userId: string
+  email: string
+  emailVerified: boolean
+}
+
+type ResendVerificationOtpResponse = {
+  email: string
+  requiresEmailVerification: boolean
 }
 
 type ProblemDetails = {
@@ -113,10 +153,65 @@ export async function loginLocal(email: string, password: string): Promise<Login
   })
 
   if (!response.ok) {
-    throw new Error(await readProblemMessage(response))
+    throw new Error(await readProblemMessage(response, { useLoginUnauthorizedMessage: true }))
   }
 
   return await response.json() as LoginResponse
+}
+
+export async function registerLocal(
+  email: string,
+  password: string,
+  displayName: string
+): Promise<RegisterResponse> {
+  const response = await safeFetch('/api/register', {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ email, password, displayName })
+  })
+
+  if (!response.ok) {
+    throw new Error(await readProblemMessage(response))
+  }
+
+  return await response.json() as RegisterResponse
+}
+
+export async function verifyEmailOtp(email: string, otpCode: string): Promise<VerifyEmailOtpResponse> {
+  const response = await safeFetch('/api/otp/verify-email', {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ email, otpCode })
+  })
+
+  if (!response.ok) {
+    throw new Error(await readProblemMessage(response))
+  }
+
+  return await response.json() as VerifyEmailOtpResponse
+}
+
+export async function resendVerificationOtp(email: string): Promise<ResendVerificationOtpResponse> {
+  const response = await safeFetch('/api/otp/resend-verification', {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ email })
+  })
+
+  if (!response.ok) {
+    throw new Error(await readProblemMessage(response))
+  }
+
+  return await response.json() as ResendVerificationOtpResponse
 }
 
 export async function getGoogleLoginUrl(): Promise<string> {
@@ -209,6 +304,18 @@ export async function fetchUserLinks(page = 1): Promise<UserLinksResponse> {
   return await response.json() as UserLinksResponse
 }
 
+export async function fetchLinkAnalytics(linkId: string): Promise<LinkAnalyticsResponse> {
+  const response = await safeFetch(`/api/links/${encodeURIComponent(linkId)}/analytics`, {
+    credentials: 'include'
+  })
+
+  if (!response.ok) {
+    throw new Error(await readProblemMessage(response))
+  }
+
+  return await response.json() as LinkAnalyticsResponse
+}
+
 export function saveAuthSession(session: LoginResponse) {
   const safeSession: AuthSession = {
     userId: session.userId,
@@ -269,8 +376,15 @@ export function shortUrl(slug: string) {
   return `${API_BASE_URL}/${slug}`
 }
 
-async function readProblemMessage(response: Response) {
+async function readProblemMessage(
+  response: Response,
+  options: { useLoginUnauthorizedMessage?: boolean } = {}
+) {
   if (response.status === 401) {
+    if (options.useLoginUnauthorizedMessage) {
+      return 'Email or password is incorrect.'
+    }
+
     return 'Please sign in again to continue.'
   }
 
@@ -292,6 +406,10 @@ async function readProblemMessage(response: Response) {
     problem = await response.json() as ProblemDetails
   } catch {
     problem = null
+  }
+
+  if (problem?.title === 'One or more validation errors occurred.') {
+    return 'Please check your information and try again.'
   }
 
   return problem?.detail || problem?.title || 'Something went wrong. Please try again.'

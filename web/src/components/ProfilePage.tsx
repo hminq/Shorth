@@ -25,6 +25,7 @@ type FieldErrors = Partial<Record<
 
 const allowedAvatarTypes = new Set(['image/png', 'image/jpeg', 'image/webp'])
 const maxAvatarSizeBytes = 1_048_576
+const strongPasswordPattern = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z0-9])\S+$/
 
 export function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -133,8 +134,10 @@ export function ProfilePage() {
       nextFieldErrors.displayName = 'Display name is required.'
     }
 
-    if (trimmedNewPassword && trimmedNewPassword.length < 8) {
-      nextFieldErrors.newPassword = 'New password must be at least 8 characters.'
+    if (trimmedNewPassword && (trimmedNewPassword.length < 8 || trimmedNewPassword.length > 72)) {
+      nextFieldErrors.newPassword = 'New password must be between 8 and 72 characters.'
+    } else if (trimmedNewPassword && !strongPasswordPattern.test(trimmedNewPassword)) {
+      nextFieldErrors.newPassword = 'Use uppercase, lowercase, a number, and a special character. No spaces.'
     }
 
     if (trimmedNewPassword && profile.hasPassword && !trimmedCurrentPassword) {
@@ -226,6 +229,9 @@ export function ProfilePage() {
                 ) : (
                   getInitials(displayName)
                 )}
+                <span className="profile-avatar-overlay" aria-hidden="true">
+                  Edit
+                </span>
               </button>
 
               <input

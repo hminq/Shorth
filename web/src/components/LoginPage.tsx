@@ -11,8 +11,11 @@ type LoginState =
   | { status: 'success'; message: string }
   | { status: 'error'; message: string }
 
+type LoginFieldErrors = Partial<Record<'email' | 'password', string>>
+
 export function LoginPage() {
   const [state, setState] = useState<LoginState>({ status: 'idle' })
+  const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({})
   const [isPasswordVisible, setIsPasswordVisible] = useState(false)
 
   async function handleLocalLogin(event: FormEvent<HTMLFormElement>) {
@@ -21,12 +24,25 @@ export function LoginPage() {
     const formData = new FormData(event.currentTarget)
     const email = String(formData.get('email') ?? '').trim()
     const password = String(formData.get('password') ?? '')
+    const nextFieldErrors: LoginFieldErrors = {}
 
-    if (!email || !password) {
-      setState({ status: 'error', message: 'Enter your email and password.' })
+    if (!email) {
+      nextFieldErrors.email = 'Email is required.'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      nextFieldErrors.email = 'Enter a valid email address.'
+    }
+
+    if (!password) {
+      nextFieldErrors.password = 'Password is required.'
+    }
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors)
+      setState({ status: 'idle' })
       return
     }
 
+    setFieldErrors({})
     setState({ status: 'loading', message: 'Signing in...' })
 
     try {
@@ -34,9 +50,10 @@ export function LoginPage() {
       saveProfileSession(await fetchMe())
       window.location.href = '/'
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not sign in.'
       setState({
         status: 'error',
-        message: error instanceof Error ? error.message : 'Could not sign in.'
+        message
       })
     }
   }
@@ -65,11 +82,21 @@ export function LoginPage() {
         </div>
 
         <section className="auth-card" aria-label="Sign in form">
-          <form className="auth-form" onSubmit={handleLocalLogin}>
+          <form className="auth-form" onSubmit={handleLocalLogin} noValidate>
             <label className="field-label" htmlFor="email">
               Email <span>*</span>
             </label>
-            <input id="email" name="email" type="email" autoComplete="email" required />
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              aria-invalid={Boolean(fieldErrors.email)}
+              aria-describedby={fieldErrors.email ? 'email-error' : undefined}
+            />
+            {fieldErrors.email && (
+              <p className="field-error" id="email-error">{fieldErrors.email}</p>
+            )}
 
             <label className="field-label" htmlFor="password">
               Password <span>*</span>
@@ -80,7 +107,8 @@ export function LoginPage() {
                 name="password"
                 type={isPasswordVisible ? 'text' : 'password'}
                 autoComplete="current-password"
-                required
+                aria-invalid={Boolean(fieldErrors.password)}
+                aria-describedby={fieldErrors.password ? 'password-error' : undefined}
               />
               <button
                 className="password-toggle"
@@ -91,6 +119,9 @@ export function LoginPage() {
                 {isPasswordVisible ? <EyeSlash weight="bold" /> : <Eye weight="bold" />}
               </button>
             </div>
+            {fieldErrors.password && (
+              <p className="field-error" id="password-error">{fieldErrors.password}</p>
+            )}
 
             <Button type="submit" disabled={state.status === 'loading'}>
               Sign in
