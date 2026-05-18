@@ -13,6 +13,8 @@ namespace Application.Features.Auth.Services;
 public sealed class AuthService
 {
     private static readonly TimeSpan ResendCooldown = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan OtpRequestRateLimitWindow = TimeSpan.FromHours(1);
+    private const int OtpRequestRateLimitMaxRequests = 5;
 
     private readonly IUserRepository _userRepository;
     private readonly IUserIdentityRepository _userIdentityRepository;
@@ -25,6 +27,9 @@ public sealed class AuthService
     private readonly IPasswordHasher _passwordHasher;
     private readonly IGoogleAuthProvider _googleAuthProvider;
     private readonly IGoogleAuthStateRepository _googleAuthStateStore;
+    private readonly IAuthLinkBuilder _authLinkBuilder;
+    private readonly IPasswordResetTokenRepository _passwordResetTokenRepository;
+    private readonly IOtpRequestRateLimiter _otpRequestRateLimiter;
 
     public AuthService(
         IUserRepository userRepository,
@@ -37,7 +42,10 @@ public sealed class AuthService
         IJwtTokenGenerator jwtTokenGenerator,
         IPasswordHasher passwordHasher,
         IGoogleAuthProvider googleAuthProvider,
-        IGoogleAuthStateRepository googleAuthStateStore)
+        IGoogleAuthStateRepository googleAuthStateStore,
+        IAuthLinkBuilder authLinkBuilder,
+        IPasswordResetTokenRepository passwordResetTokenRepository,
+        IOtpRequestRateLimiter otpRequestRateLimiter)
     {
         _userRepository = userRepository;
         _userIdentityRepository = userIdentityRepository;
@@ -50,6 +58,9 @@ public sealed class AuthService
         _passwordHasher = passwordHasher;
         _googleAuthProvider = googleAuthProvider;
         _googleAuthStateStore = googleAuthStateStore;
+        _authLinkBuilder = authLinkBuilder;
+        _passwordResetTokenRepository = passwordResetTokenRepository;
+        _otpRequestRateLimiter = otpRequestRateLimiter;
     }
 
     public async Task<GoogleLoginUrlResult> GenerateGoogleLoginUrlAsync(CancellationToken ct = default)
@@ -367,6 +378,12 @@ public sealed class AuthService
 
         var email = request.Email.Trim();
         var normalizedEmail = EmailNormalizer.Normalize(email);
+
+        if (!await CanSendOtpAsync("register-verification", normalizedEmail, request.ClientIp, ct))
+        {
+            throw new OtpResendTooSoonException("Please wait before requesting another code.");
+        }
+
         var foundUser = await _userRepository.GetByEmailNormalizedAsync(normalizedEmail, ct);
         if (foundUser is null)
         {
@@ -444,6 +461,7 @@ public sealed class AuthService
 
         var email = request.Email.Trim();
         var normalizedEmail = EmailNormalizer.Normalize(email);
+
         var foundUser = await _userRepository.GetByEmailNormalizedAsync(normalizedEmail, ct);
         if (foundUser is null)
         {
@@ -498,6 +516,230 @@ public sealed class AuthService
         }
 
         throw new WrongOtpException("Incorrect verification code.");
+    }
+
+    public async Task<ForgotPasswordResult> ForgotPasswordAsync(
+        ForgotPasswordRequest request,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            throw new ArgumentException("Email is required.", nameof(request));
+        }
+
+        var email = request.Email.Trim();
+        var normalizedEmail = EmailNormalizer.Normalize(email);
+
+        if (!await CanSendOtpAsync("forgot-password", normalizedEmail, request.ClientIp, ct))
+        {
+            return new ForgotPasswordResult(email);
+        }
+
+        var foundUser = await _userRepository.GetByEmailNormalizedAsync(normalizedEmail, ct);
+
+        if (foundUser is null
+            || foundUser.Status == UserStatus.Disabled
+            || !foundUser.EmailVerifiedAt.HasValue
+            || string.IsNullOrWhiteSpace(foundUser.Email)
+            || string.IsNullOrWhiteSpace(foundUser.EmailNormalized))
+        {
+            return new ForgotPasswordResult(email);
+        }
+
+        var latestPasswordResetOtp = await _userOtpRepository.GetLatestByUserIdAndPurposeAsync(
+            foundUser.Id,
+            OtpPurpose.PasswordReset,
+            ct);
+
+        if (latestPasswordResetOtp is not null)
+        {
+            var lastSentAt = latestPasswordResetOtp.LastSentAt ?? latestPasswordResetOtp.CreatedAt;
+            if (DateTime.UtcNow - lastSentAt < ResendCooldown)
+            {
+                return new ForgotPasswordResult(email);
+            }
+
+            if (IsActiveOtp(latestPasswordResetOtp, DateTime.UtcNow))
+            {
+                latestPasswordResetOtp.Invalidate(DateTime.UtcNow);
+            }
+        }
+
+        var createdAt = DateTime.UtcNow;
+        var otpCode = _otpCodeGenerator.GenerateNumericCode(OtpRules.CodeLength);
+        var otpCodeHash = _passwordHasher.Hash(otpCode);
+        var passwordResetOtp = UserOtp.Create(
+            foundUser.Id,
+            OtpPurpose.PasswordReset,
+            otpCodeHash,
+            OtpRules.MaxAttempts,
+            createdAt,
+            createdAt.Add(OtpRules.PasswordResetTtl));
+        passwordResetOtp.MarkSent(createdAt);
+
+        var emailJob = new EmailJobMessage(
+            EmailJobType.ForgotPassword,
+            foundUser.Id,
+            foundUser.Email,
+            foundUser.DisplayName,
+            otpCode,
+            DateTime.UtcNow,
+            _authLinkBuilder.BuildPasswordResetUrl(foundUser.Email));
+
+        await _userOtpRepository.RefreshWithEmailJobAsync(latestPasswordResetOtp, passwordResetOtp, emailJob, ct);
+
+        return new ForgotPasswordResult(email);
+    }
+
+    private async Task<bool> CanSendOtpAsync(
+        string purpose,
+        string normalizedEmail,
+        string? clientIp,
+        CancellationToken ct)
+    {
+        var normalizedClientIp = string.IsNullOrWhiteSpace(clientIp) ? "unknown" : clientIp.Trim();
+        var emailKey = $"rate:otp-send:{purpose}:email:{normalizedEmail}";
+        var ipKey = $"rate:otp-send:{purpose}:ip:{normalizedClientIp}";
+
+        var emailAllowed = await _otpRequestRateLimiter.TryConsumeAsync(
+            emailKey,
+            OtpRequestRateLimitMaxRequests,
+            OtpRequestRateLimitWindow,
+            ct);
+        var ipAllowed = await _otpRequestRateLimiter.TryConsumeAsync(
+            ipKey,
+            OtpRequestRateLimitMaxRequests,
+            OtpRequestRateLimitWindow,
+            ct);
+
+        return emailAllowed && ipAllowed;
+    }
+
+    public async Task<VerifyPasswordResetResult> VerifyPasswordResetAsync(
+        VerifyPasswordResetRequest request,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            throw new ArgumentException("Email is required.", nameof(request));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.OtpCode))
+        {
+            throw new ArgumentException("Reset code is required.", nameof(request));
+        }
+
+        var email = request.Email.Trim();
+        var normalizedEmail = EmailNormalizer.Normalize(email);
+        var foundUser = await _userRepository.GetByEmailNormalizedAsync(normalizedEmail, ct);
+        if (foundUser is null
+            || foundUser.Status == UserStatus.Disabled
+            || !foundUser.EmailVerifiedAt.HasValue
+            || string.IsNullOrWhiteSpace(foundUser.Email)
+            || string.IsNullOrWhiteSpace(foundUser.EmailNormalized))
+        {
+            throw new VerificationOtpInactiveException("Reset code is no longer valid. Request a new one.");
+        }
+
+        var latestPasswordResetOtp = await _userOtpRepository.GetLatestByUserIdAndPurposeAsync(
+            foundUser.Id,
+            OtpPurpose.PasswordReset,
+            ct);
+
+        if (latestPasswordResetOtp is null)
+        {
+            throw new VerificationOtpInactiveException("Reset code is no longer valid. Request a new one.");
+        }
+
+        if (latestPasswordResetOtp.IsUsed()
+            || latestPasswordResetOtp.IsInvalidated()
+            || latestPasswordResetOtp.IsExpired(DateTime.UtcNow))
+        {
+            throw new VerificationOtpInactiveException("Reset code is no longer valid. Request a new one.");
+        }
+
+        if (!_passwordHasher.Verify(request.OtpCode, latestPasswordResetOtp.CodeHash))
+        {
+            latestPasswordResetOtp.IncrementAttempt();
+            await _userOtpRepository.IncrementAttemptAsync(latestPasswordResetOtp, ct);
+
+            if (latestPasswordResetOtp.HasExceededAttempts())
+            {
+                throw new OtpMaxAttemptsExceededException("Too many attempts. Request a new reset code.");
+            }
+
+            throw new WrongOtpException("Incorrect reset code.");
+        }
+
+        var now = DateTime.UtcNow;
+        var resetToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+
+        latestPasswordResetOtp.MarkUsed(now);
+        await _userOtpRepository.CompletePasswordResetVerificationAsync(latestPasswordResetOtp, ct);
+        await _passwordResetTokenRepository.StoreAsync(
+            resetToken,
+            new PasswordResetTokenState(foundUser.Id, email, now),
+            ct);
+
+        return new VerifyPasswordResetResult(email, resetToken);
+    }
+
+    public async Task<PasswordResetResult> CompletePasswordResetAsync(
+        CompletePasswordResetRequest request,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.ResetToken))
+        {
+            throw new VerificationOtpInactiveException("Reset session is no longer valid. Request a new code.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.NewPassword))
+        {
+            throw new ArgumentException("Password is required.", nameof(request));
+        }
+
+        var resetState = await _passwordResetTokenRepository.TakeAsync(request.ResetToken, ct);
+        if (resetState is null)
+        {
+            throw new VerificationOtpInactiveException("Reset session is no longer valid. Request a new code.");
+        }
+
+        var foundUser = await _userRepository.GetByIdAsync(resetState.UserId, ct);
+        if (foundUser is null
+            || foundUser.Status == UserStatus.Disabled
+            || !foundUser.EmailVerifiedAt.HasValue
+            || string.IsNullOrWhiteSpace(foundUser.Email)
+            || string.IsNullOrWhiteSpace(foundUser.EmailNormalized))
+        {
+            throw new VerificationOtpInactiveException("Reset session is no longer valid. Request a new code.");
+        }
+
+        var identities = await _userIdentityRepository.GetByUserIdAsync(foundUser.Id, ct);
+        var localIdentity = identities.FirstOrDefault(x => x.Provider == IdentityProvider.Local);
+        var shouldAddLocalIdentity = localIdentity is null;
+        var passwordHash = _passwordHasher.Hash(request.NewPassword);
+        var now = DateTime.UtcNow;
+
+        if (localIdentity is null)
+        {
+            localIdentity = UserIdentity.CreateLocal(
+                foundUser.Id,
+                foundUser.Email,
+                foundUser.EmailNormalized,
+                passwordHash,
+                now);
+        }
+        else
+        {
+            localIdentity.UpdatePasswordHash(passwordHash, now);
+        }
+
+        await _userRepository.CompletePasswordResetAsync(
+            localIdentity,
+            shouldAddLocalIdentity,
+            ct);
+
+        return new PasswordResetResult(foundUser.Email, PasswordReset: true);
     }
 
     private static bool IsActiveOtp(UserOtp otp, DateTime at)

@@ -15,6 +15,7 @@ using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Resend;
+using StackExchange.Redis;
 
 namespace Infrastucture;
 
@@ -32,6 +33,7 @@ public static class DependencyInjection
         var emailOptions = ReadEmailOptions(configuration);
         var jwtOptions = ReadJwtOptions(configuration);
         var turnstileOptions = ReadTurnstileOptions(configuration);
+        var webClientOptions = ReadWebClientOptions(configuration);
 
         services.AddSingleton(databaseOptions);
         services.AddSingleton(redisOptions);
@@ -43,6 +45,7 @@ public static class DependencyInjection
         services.AddSingleton(emailOptions);
         services.AddSingleton(jwtOptions);
         services.AddSingleton(turnstileOptions);
+        services.AddSingleton(webClientOptions);
 
         services
             .AddDatabase(databaseOptions)
@@ -82,6 +85,8 @@ public static class DependencyInjection
             cacheOptions.Configuration = options.ConnectionString;
             cacheOptions.InstanceName = options.InstanceName;
         });
+        services.AddSingleton<IConnectionMultiplexer>(_ =>
+            ConnectionMultiplexer.Connect(options.ConnectionString));
 
         return services;
     }
@@ -142,7 +147,13 @@ public static class DependencyInjection
             new GoogleAuthStateRepository(
                 provider.GetRequiredService<IDistributedCache>(),
                 TimeSpan.FromMinutes(provider.GetRequiredService<GoogleAuthOptions>().StateTtlMinutes)));
+        services.AddScoped<IPasswordResetTokenRepository>(provider =>
+            new PasswordResetTokenRepository(
+                provider.GetRequiredService<IDistributedCache>(),
+                TimeSpan.FromMinutes(5)));
         services.AddScoped<IEmailJobQueue, SqsEmailJobQueue>();
+        services.AddScoped<IAuthLinkBuilder, AuthLinkBuilder>();
+        services.AddScoped<IOtpRequestRateLimiter, RedisOtpRequestRateLimiter>();
         services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<IOutboxRepository, OutboxRepository>();
@@ -244,6 +255,12 @@ public static class DependencyInjection
     {
         return new TurnstileOptions(
             Required(configuration, "TURNSTILE_SECRET_KEY", "Turnstile secret key is not configured."));
+    }
+
+    private static WebClientOptions ReadWebClientOptions(IConfiguration configuration)
+    {
+        return new WebClientOptions(
+            Required(configuration, "WEB_BASE_URL", "Web base url is not configured."));
     }
 
     private static string Required(

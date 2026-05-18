@@ -180,14 +180,19 @@ public sealed class LinkService
         var from = request.From ?? today.AddDays(-(DefaultAnalyticsWindowDays - 1));
         var to = request.To ?? today;
 
+        if (to > today)
+        {
+            to = today;
+        }
+
         if (from > to)
         {
-            throw new ArgumentException("Analytics start date must be before end date.", nameof(request));
+            from = to;
         }
 
         if (to.DayNumber - from.DayNumber + 1 > MaxAnalyticsWindowDays)
         {
-            throw new ArgumentException($"Analytics range cannot be longer than {MaxAnalyticsWindowDays} days.", nameof(request));
+            from = to.AddDays(-(MaxAnalyticsWindowDays - 1));
         }
 
         var fromDateTime = DateTime.SpecifyKind(from.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);

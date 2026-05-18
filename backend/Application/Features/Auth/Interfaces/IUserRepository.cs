@@ -10,4 +10,8 @@ public interface IUserRepository
     Task AddAsync(User user, CancellationToken ct = default);
     Task UpdateAsync(User user, CancellationToken ct = default);
     Task UpdateWithNewIdentityAsync(User user, UserIdentity identity, CancellationToken ct = default);
+    Task CompletePasswordResetAsync(
+        UserIdentity localIdentity,
+        bool addLocalIdentity,
+        CancellationToken ct = default);
 }

@@ -69,4 +69,37 @@ public sealed class UserRepository : IUserRepository
             throw new InvalidOperationException("Failed to update user with identity.", ex);
         }
     }
+
+    public async Task CompletePasswordResetAsync(
+        UserIdentity localIdentity,
+        bool addLocalIdentity,
+        CancellationToken ct = default)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
+
+        try
+        {
+            if (addLocalIdentity)
+            {
+                await _dbContext.UserIdentities.AddAsync(localIdentity, ct);
+            }
+            else
+            {
+                _dbContext.UserIdentities.Update(localIdentity);
+            }
+
+            await _dbContext.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+        }
+        catch (DbUpdateException ex)
+        {
+            await transaction.RollbackAsync(ct);
+            throw new InvalidOperationException("Failed to reset password.", ex);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(ct);
+            throw;
+        }
+    }
 }

@@ -82,20 +82,26 @@ public sealed class GlobalExceptionHandler(
             },
             VerificationOtpInactiveException => new ProblemDetails
             {
-                Title = "Verification code inactive",
-                Detail = "This verification code is no longer valid. Request a new one.",
+                Title = IsPasswordResetPath(httpContext) ? "Reset code inactive" : "Verification code inactive",
+                Detail = IsPasswordResetPath(httpContext)
+                    ? "This reset code is no longer valid. Request a new one."
+                    : "This verification code is no longer valid. Request a new one.",
                 Status = StatusCodes.Status409Conflict
             },
             OtpMaxAttemptsExceededException => new ProblemDetails
             {
                 Title = "Otp max attempts exceeded",
-                Detail = "Too many attempts. Request a new verification code.",
+                Detail = IsPasswordResetPath(httpContext)
+                    ? "Too many attempts. Request a new reset code."
+                    : "Too many attempts. Request a new verification code.",
                 Status = StatusCodes.Status409Conflict
             },
             WrongOtpException => new ProblemDetails
             {
                 Title = "Wrong otp",
-                Detail = "The verification code is incorrect.",
+                Detail = IsPasswordResetPath(httpContext)
+                    ? "The reset code is incorrect."
+                    : "The verification code is incorrect.",
                 Status = StatusCodes.Status400BadRequest
             },
             DomainException => new ProblemDetails
@@ -155,5 +161,11 @@ public sealed class GlobalExceptionHandler(
             Detail = "Current password is incorrect.",
             Status = StatusCodes.Status401Unauthorized
         };
+    }
+
+    private static bool IsPasswordResetPath(HttpContext httpContext)
+    {
+        return httpContext.Request.Path.StartsWithSegments("/api/password-reset")
+            || httpContext.Request.Path.StartsWithSegments("/api/forgot-password");
     }
 }
