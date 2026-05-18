@@ -6,5 +6,6 @@ public sealed record EmailJobMessage(
     string Email,
     string? DisplayName,
     string? OtpCode,
-    DateTime EnqueuedAtUtc
+    DateTime EnqueuedAtUtc,
+    string? ActionUrl = null
 );

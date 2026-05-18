@@ -57,13 +57,16 @@ public sealed class ResendEmailService : IEmailService
     {
         var greetingName = string.IsNullOrWhiteSpace(job.DisplayName) ? "there" : job.DisplayName;
         var otpCode = job.OtpCode ?? throw new InvalidOperationException("Otp code is required for this email job.");
+        var passwordResetLinkText = string.IsNullOrWhiteSpace(job.ActionUrl)
+            ? string.Empty
+            : $"\n\nYou can continue here: {job.ActionUrl}";
 
         return job.Type switch
         {
             EmailJobType.VerifyEmail =>
                 $"Hi {greetingName},\n\nUse this verification code to activate your account: {otpCode}\n\nThis code expires in 10 minutes.",
             EmailJobType.ForgotPassword =>
-                $"Hi {greetingName},\n\nUse this code to reset your Shorth password: {otpCode}\n\nThis code expires in 10 minutes.",
+                $"Hi {greetingName},\n\nUse this code to reset your Shorth password: {otpCode}{passwordResetLinkText}\n\nThis code expires in 10 minutes.",
             _ => throw new InvalidOperationException($"Unsupported email job type: {job.Type}.")
         };
     }
@@ -84,6 +87,16 @@ public sealed class ResendEmailService : IEmailService
             EmailJobType.ForgotPassword => "Use the code below to continue resetting your password.",
             _ => throw new InvalidOperationException($"Unsupported email job type: {job.Type}.")
         };
+        var actionHtml = job.Type == EmailJobType.ForgotPassword && !string.IsNullOrWhiteSpace(job.ActionUrl)
+            ? $"""
+               <div style="margin:0 0 30px;text-align:center;">
+                 <a href="{System.Net.WebUtility.HtmlEncode(job.ActionUrl)}"
+                    style="display:inline-block;border:3px solid #202124;padding:14px 22px;background:#011936;color:#ffffff;font-size:14px;font-weight:700;letter-spacing:0.12em;text-decoration:none;text-transform:uppercase;">
+                   Reset password
+                 </a>
+               </div>
+               """
+            : string.Empty;
 
         return $"""
                 <!DOCTYPE html>
@@ -119,6 +132,7 @@ public sealed class ResendEmailService : IEmailService
                           {System.Net.WebUtility.HtmlEncode(otpCode)}
                         </div>
                       </div>
+                      {actionHtml}
                       <p style="margin:0 0 12px;font-size:16px;line-height:1.65;color:#3c4043;">
                         This code expires in 10 minutes.
                       </p>

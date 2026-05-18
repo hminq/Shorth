@@ -21,7 +21,9 @@ public sealed class OtpController : ControllerBase
         [FromBody] ResendVerificationOtpHttpRequest request,
         CancellationToken ct)
     {
-        var serviceRequest = new ResendVerificationOtpRequest(request.Email);
+        var serviceRequest = new ResendVerificationOtpRequest(
+            request.Email,
+            HttpContext.Connection.RemoteIpAddress?.ToString());
         var resendResult = await _authService.ResendVerificationOtpAsync(serviceRequest, ct);
         var response = new ResendVerificationOtpHttpResponse(
             resendResult.Email,
