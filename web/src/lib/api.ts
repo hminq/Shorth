@@ -112,6 +112,21 @@ type ResendVerificationOtpResponse = {
   requiresEmailVerification: boolean
 }
 
+type ForgotPasswordResponse = {
+  email: string
+  message: string
+}
+
+type PasswordResetResponse = {
+  email: string
+  passwordReset: boolean
+}
+
+type VerifyPasswordResetResponse = {
+  email: string
+  resetToken: string
+}
+
 type ProblemDetails = {
   title?: string
   detail?: string
@@ -214,6 +229,63 @@ export async function resendVerificationOtp(email: string): Promise<ResendVerifi
   return await response.json() as ResendVerificationOtpResponse
 }
 
+export async function forgotPassword(email: string): Promise<ForgotPasswordResponse> {
+  const response = await safeFetch('/api/forgot-password', {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ email })
+  })
+
+  if (!response.ok) {
+    throw new Error(await readProblemMessage(response))
+  }
+
+  return await response.json() as ForgotPasswordResponse
+}
+
+export async function verifyPasswordReset(
+  email: string,
+  otpCode: string
+): Promise<VerifyPasswordResetResponse> {
+  const response = await safeFetch('/api/password-reset/verify', {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ email, otpCode })
+  })
+
+  if (!response.ok) {
+    throw new Error(await readProblemMessage(response))
+  }
+
+  return await response.json() as VerifyPasswordResetResponse
+}
+
+export async function completePasswordReset(
+  resetToken: string,
+  newPassword: string
+): Promise<PasswordResetResponse> {
+  const response = await safeFetch('/api/password-reset/complete', {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ resetToken, newPassword })
+  })
+
+  if (!response.ok) {
+    throw new Error(await readProblemMessage(response))
+  }
+
+  return await response.json() as PasswordResetResponse
+}
+
 export async function getGoogleLoginUrl(): Promise<string> {
   const response = await safeFetch('/api/login/google', {
     credentials: 'include'
@@ -304,8 +376,27 @@ export async function fetchUserLinks(page = 1): Promise<UserLinksResponse> {
   return await response.json() as UserLinksResponse
 }
 
-export async function fetchLinkAnalytics(linkId: string): Promise<LinkAnalyticsResponse> {
-  const response = await safeFetch(`/api/links/${encodeURIComponent(linkId)}/analytics`, {
+export type LinkAnalyticsQuery = {
+  from?: string
+  to?: string
+}
+
+export async function fetchLinkAnalytics(
+  linkId: string,
+  query: LinkAnalyticsQuery = {}
+): Promise<LinkAnalyticsResponse> {
+  const params = new URLSearchParams()
+
+  if (query.from) {
+    params.set('from', query.from)
+  }
+
+  if (query.to) {
+    params.set('to', query.to)
+  }
+
+  const suffix = params.size > 0 ? `?${params.toString()}` : ''
+  const response = await safeFetch(`/api/links/${encodeURIComponent(linkId)}/analytics${suffix}`, {
     credentials: 'include'
   })
 

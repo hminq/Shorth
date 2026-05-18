@@ -3,10 +3,12 @@ import type { ComponentType } from 'react'
 import { createRoot } from 'react-dom/client'
 import './style.css'
 import { AuthCallbackPage } from './components/AuthCallbackPage'
+import { ForgotPasswordPage } from './components/ForgotPasswordPage'
 import { HomePage } from './components/HomePage'
 import { LoginPage } from './components/LoginPage'
 import { LinkAnalyticsPage } from './components/LinkAnalyticsPage'
 import { MyLinksPage } from './components/MyLinksPage'
+import { PasswordResetPage } from './components/PasswordResetPage'
 import { ProfilePage } from './components/ProfilePage'
 import { RegisterPage } from './components/RegisterPage'
 import { RegisterVerifyPage } from './components/RegisterVerifyPage'
@@ -20,6 +22,8 @@ if (!app) {
 const routes: Record<string, ComponentType> = {
   '/': HomePage,
   '/login': LoginPage,
+  '/forgot-password': ForgotPasswordPage,
+  '/password-reset': PasswordResetPage,
   '/register': RegisterPage,
   '/register/verify': RegisterVerifyPage,
   '/auth/callback': AuthCallbackPage,

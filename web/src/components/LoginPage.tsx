@@ -122,6 +122,9 @@ export function LoginPage() {
             {fieldErrors.password && (
               <p className="field-error" id="password-error">{fieldErrors.password}</p>
             )}
+            <p className="auth-field-action">
+              <a href="/forgot-password">Forgot password?</a>
+            </p>
 
             <Button type="submit" disabled={state.status === 'loading'}>
               Sign in
