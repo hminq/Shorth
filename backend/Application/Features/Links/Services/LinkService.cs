@@ -12,6 +12,7 @@ public sealed class LinkService
     private const int DefaultAnalyticsWindowDays = 30;
     private const int MaxAnalyticsWindowDays = 366;
     private const int TopCountriesLimit = 3;
+    private const int TopReferrersLimit = 4;
 
     private readonly ILinkRepository _linkRepository;
     private readonly ILinkClickEventRepository _linkClickEventRepository;
@@ -128,36 +129,6 @@ public sealed class LinkService
             items);
     }
 
-    public async Task<LinkDetailResult?> GetLinkDetailAsync(GetLinkDetailRequest request, CancellationToken ct = default)
-    {
-        if (request.UserId == Guid.Empty)
-        {
-            throw new ArgumentException("User id is required.", nameof(request));
-        }
-
-        if (request.LinkId == Guid.Empty)
-        {
-            throw new ArgumentException("Link id is required.", nameof(request));
-        }
-
-        var link = await _linkRepository.GetByIdAsync(request.LinkId, ct);
-        if (link is null || link.OwnerId != request.UserId)
-        {
-            return null;
-        }
-
-        return new LinkDetailResult(
-            link.Id,
-            link.Slug,
-            link.DestinationUrl,
-            link.ClickCount,
-            link.LastClickedAt,
-            link.CreatedAt,
-            link.UpdatedAt,
-            link.ExpiresAt,
-            link.IsDisabled);
-    }
-
     public async Task<LinkAnalyticsResult?> GetLinkAnalyticsAsync(GetLinkAnalyticsRequest request, CancellationToken ct = default)
     {
         if (request.UserId == Guid.Empty)
@@ -204,6 +175,12 @@ public sealed class LinkService
             toExclusive,
             TopCountriesLimit,
             ct);
+        var topReferrers = await _linkClickEventRepository.GetTopReferrersAsync(
+            link.Id,
+            fromDateTime,
+            toExclusive,
+            TopReferrersLimit,
+            ct);
 
         return new LinkAnalyticsResult(
             link.Id,
@@ -212,7 +189,8 @@ public sealed class LinkService
             from,
             to,
             daily,
-            topCountries);
+            topCountries,
+            topReferrers);
     }
 
     public async Task<ResolveLinkResult> ResolveShortLinkAsync(ResolveLinkRequest request, CancellationToken ct)

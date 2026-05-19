@@ -7,4 +7,5 @@ public sealed record LinkAnalyticsResult(
     DateOnly From,
     DateOnly To,
     IReadOnlyList<LinkDailyAnalyticsItem> Daily,
-    IReadOnlyList<LinkCountryAnalyticsItem> TopCountries);
+    IReadOnlyList<LinkCountryAnalyticsItem> TopCountries,
+    IReadOnlyList<LinkReferrerAnalyticsItem> TopReferrers);

@@ -35,30 +35,6 @@ namespace Api.Features.Links
         }
 
         [Authorize]
-        [HttpGet("{id:guid}")]
-        public async Task<ActionResult<LinkDetailHttpResponse>> GetLinkDetail(
-            [FromRoute] Guid id,
-            CancellationToken ct)
-        {
-            var userId = GetCurrentUserId();
-            var result = await _linkService.GetLinkDetailAsync(
-                new GetLinkDetailRequest(userId, id),
-                ct);
-
-            if (result is null)
-            {
-                return NotFound(new ProblemDetails
-                {
-                    Title = "Link not found",
-                    Detail = "The link does not exist.",
-                    Status = StatusCodes.Status404NotFound
-                });
-            }
-
-            return Ok(ToHttpResponse(result));
-        }
-
-        [Authorize]
         [HttpGet("{id:guid}/analytics")]
         public async Task<ActionResult<LinkAnalyticsHttpResponse>> GetLinkAnalytics(
             [FromRoute] Guid id,
@@ -96,7 +72,7 @@ namespace Api.Features.Links
 
             var response = ToHttpResponse(result);
 
-            return Created($"/api/links/{result.Id}", response);
+            return Created($"/api/links/{result.Id}/analytics", response);
         }
 
         [HttpGet("/{slug}")]
@@ -276,20 +252,6 @@ namespace Api.Features.Links
                     .ToList());
         }
 
-        private static LinkDetailHttpResponse ToHttpResponse(LinkDetailResult result)
-        {
-            return new LinkDetailHttpResponse(
-                result.Id,
-                result.Slug,
-                result.DestinationUrl,
-                result.ClickCount,
-                result.LastClickedAt,
-                result.CreatedAt,
-                result.UpdatedAt,
-                result.ExpiresAt,
-                result.IsDisabled);
-        }
-
         private static LinkAnalyticsHttpResponse ToHttpResponse(LinkAnalyticsResult result)
         {
             return new LinkAnalyticsHttpResponse(
@@ -307,6 +269,13 @@ namespace Api.Features.Links
                 result.TopCountries
                     .Select(item => new LinkCountryAnalyticsHttpResponse(
                         item.CountryCode,
+                        item.Clicks,
+                        item.Percent))
+                    .ToList(),
+                result.TopReferrers
+                    .Select(item => new LinkReferrerAnalyticsHttpResponse(
+                        item.Source,
+                        item.Label,
                         item.Clicks,
                         item.Percent))
                     .ToList());

@@ -20,4 +20,10 @@ public interface ILinkClickEventRepository
         DateTime toExclusive,
         int take,
         CancellationToken ct = default);
+    Task<IReadOnlyList<LinkReferrerAnalyticsItem>> GetTopReferrersAsync(
+        Guid linkId,
+        DateTime from,
+        DateTime toExclusive,
+        int take,
+        CancellationToken ct = default);
 }

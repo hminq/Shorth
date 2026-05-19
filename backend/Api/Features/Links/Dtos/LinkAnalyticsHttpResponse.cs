@@ -7,4 +7,5 @@ public sealed record LinkAnalyticsHttpResponse(
     DateOnly From,
     DateOnly To,
     IReadOnlyList<LinkDailyAnalyticsHttpResponse> Daily,
-    IReadOnlyList<LinkCountryAnalyticsHttpResponse> TopCountries);
+    IReadOnlyList<LinkCountryAnalyticsHttpResponse> TopCountries,
+    IReadOnlyList<LinkReferrerAnalyticsHttpResponse> TopReferrers);

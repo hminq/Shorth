@@ -8,6 +8,27 @@ namespace Infrastucture.Repositories;
 
 public sealed class LinkClickEventRepository : ILinkClickEventRepository
 {
+    private static readonly IReadOnlyList<(string Source, string Label)> SupportedReferrers =
+    [
+        ("facebook", "Facebook"),
+        ("instagram", "Instagram"),
+        ("x", "X"),
+        ("tiktok", "TikTok")
+    ];
+
+    private static readonly IReadOnlyDictionary<string, (string Source, string Label)> KnownReferrers =
+        new Dictionary<string, (string Source, string Label)>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["facebook.com"] = ("facebook", "Facebook"),
+            ["fb.com"] = ("facebook", "Facebook"),
+            ["instagram.com"] = ("instagram", "Instagram"),
+            ["x.com"] = ("x", "X"),
+            ["twitter.com"] = ("x", "X"),
+            ["t.co"] = ("x", "X"),
+            ["tiktok.com"] = ("tiktok", "TikTok"),
+            ["tiktokv.com"] = ("tiktok", "TikTok")
+        };
+
     private readonly AppDbContext _dbContext;
 
     public LinkClickEventRepository(AppDbContext dbContext)
@@ -132,5 +153,67 @@ public sealed class LinkClickEventRepository : ILinkClickEventRepository
                 x.Clicks,
                 decimal.Round(x.Clicks * 100m / totalKnownCountryClicks, 2)))
             .ToList();
+    }
+
+    public async Task<IReadOnlyList<LinkReferrerAnalyticsItem>> GetTopReferrersAsync(
+        Guid linkId,
+        DateTime from,
+        DateTime toExclusive,
+        int take,
+        CancellationToken ct = default)
+    {
+        var referrers = await _dbContext.LinkClickEvents
+            .AsNoTracking()
+            .Where(x => x.LinkId == linkId
+                        && x.ClickedAt >= from
+                        && x.ClickedAt < toExclusive)
+            .Select(x => x.Referrer)
+            .ToListAsync(ct);
+
+        var knownReferrers = referrers
+            .Select(GetKnownReferrer)
+            .Where(x => x is not null)
+            .Select(x => x!.Value)
+            .ToList();
+
+        var clicksBySource = knownReferrers
+            .GroupBy(x => x.Source)
+            .ToDictionary(x => x.Key, x => x.Count(), StringComparer.OrdinalIgnoreCase);
+        var totalKnownClicks = knownReferrers.Count;
+
+        return SupportedReferrers
+            .Select(referrer =>
+            {
+                clicksBySource.TryGetValue(referrer.Source, out var clicks);
+
+                return new LinkReferrerAnalyticsItem(
+                    referrer.Source,
+                    referrer.Label,
+                    clicks,
+                    totalKnownClicks == 0 ? 0 : decimal.Round(clicks * 100m / totalKnownClicks, 2));
+            })
+            .Take(take)
+            .ToList();
+    }
+
+    private static (string Source, string Label)? GetKnownReferrer(string? referrer)
+    {
+        if (string.IsNullOrWhiteSpace(referrer)
+            || !Uri.TryCreate(referrer, UriKind.Absolute, out var uri))
+        {
+            return null;
+        }
+
+        var host = uri.Host;
+        foreach (var knownReferrer in KnownReferrers)
+        {
+            if (host.Equals(knownReferrer.Key, StringComparison.OrdinalIgnoreCase)
+                || host.EndsWith($".{knownReferrer.Key}", StringComparison.OrdinalIgnoreCase))
+            {
+                return knownReferrer.Value;
+            }
+        }
+
+        return null;
     }
 }
