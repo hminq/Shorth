@@ -87,6 +87,13 @@ export type LinkCountryAnalytics = {
   percent: number
 }
 
+export type LinkReferrerAnalytics = {
+  source: 'facebook' | 'instagram' | 'x' | 'tiktok'
+  label: string
+  clicks: number
+  percent: number
+}
+
 export type LinkAnalyticsResponse = {
   linkId: string
   totalClicks: number
@@ -95,6 +102,7 @@ export type LinkAnalyticsResponse = {
   to: string
   daily: LinkDailyAnalytics[]
   topCountries: LinkCountryAnalytics[]
+  topReferrers: LinkReferrerAnalytics[]
 }
 
 type GoogleLoginUrlResponse = {

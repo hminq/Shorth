@@ -313,19 +313,7 @@ export function LinkForm() {
 
         {state.status === 'success' && (
           <div ref={resultRef} className="expanded-result result-with-qr">
-            <div className="link-result-card">
-              <LinkSummary link={state.link} />
-              <div className="result-actions">
-                <a className="action-button" href={state.link.shortUrl} target="_blank" rel="noreferrer">
-                  <ArrowSquareOut size={16} weight="bold" />
-                  Visit URL
-                </a>
-                <button className="action-button action-button-dark" type="button" onClick={() => void copyLink(state.link.shortUrl)}>
-                  <Copy size={16} weight="bold" />
-                  Copy
-                </button>
-              </div>
-            </div>
+            <LinkResult link={state.link} onCopy={copyLink} />
 
             <div className="qr-result-card" aria-label="QR code for short link">
               <canvas ref={qrCanvasRef} width="220" height="220" />
@@ -416,21 +404,31 @@ function DestinationFavicon({ url }: { url: string }) {
   )
 }
 
-function LinkSummary({ link }: { link: RecentLink }) {
+function LinkResult({
+  link,
+  onCopy
+}: {
+  link: RecentLink
+  onCopy: (url: string) => Promise<void>
+}) {
   const shortLinkParts = getShortLinkParts(link.shortUrl)
 
   return (
-    <div className="link-summary" aria-label="Created link summary">
-      <div>
-        <label className="field-label" htmlFor="shortSlug">Shorten</label>
-        <div className="short-link-builder">
-          <div className="short-domain-field">
-            <span>{shortLinkParts.domain}</span>
-          </div>
-          <span className="short-link-separator">/</span>
-          <input id="shortSlug" value={shortLinkParts.slug} readOnly aria-label="Short link slug" />
-        </div>
+    <div className="link-result-card" aria-label="Created link summary">
+      <label className="field-label" htmlFor="shortSlug">Shorten</label>
+      <div className="short-domain-field">
+        <span>{shortLinkParts.domain}</span>
       </div>
+      <span className="short-link-separator">/</span>
+      <input id="shortSlug" value={shortLinkParts.slug} readOnly aria-label="Short link slug" />
+      <a className="action-button visit-action" href={link.shortUrl} target="_blank" rel="noreferrer">
+        <ArrowSquareOut size={16} weight="bold" />
+        Visit
+      </a>
+      <button className="action-button action-button-dark copy-action" type="button" onClick={() => void onCopy(link.shortUrl)}>
+        <Copy size={16} weight="bold" />
+        Copy
+      </button>
     </div>
   )
 }

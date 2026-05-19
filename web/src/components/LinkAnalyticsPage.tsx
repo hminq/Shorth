@@ -1,6 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import createGlobe, { type Globe } from 'cobe'
+import {
+  FacebookLogo,
+  TwitterLogo,
+  type Icon
+} from '@phosphor-icons/react'
 import { fetchLinkAnalytics, type LinkAnalyticsResponse } from '../lib/api'
+import instagramLogoUrl from '../assets/instagram-logo.svg'
+import tiktokLogoUrl from '../assets/tiktok-logo.svg'
 import { Footer } from './Footer'
 import { Header } from './Header'
 
@@ -44,6 +51,18 @@ const countryColors = [
   { rgb: [0.02, 0.1, 0.21] as [number, number, number], css: '#011936' },
   { rgb: [0.1, 0.52, 0.29] as [number, number, number], css: '#1a854a' }
 ]
+
+const referrerIcons: Partial<Record<LinkAnalyticsResponse['topReferrers'][number]['source'], Icon>> = {
+  facebook: FacebookLogo,
+  x: TwitterLogo
+}
+
+const referrerColors: Record<LinkAnalyticsResponse['topReferrers'][number]['source'], string> = {
+  facebook: '#1877f2',
+  instagram: '#e4405f',
+  x: '#1da1f2',
+  tiktok: '#000000'
+}
 
 const maxAnalyticsWindowDays = 366
 const analyticsMessageMs = 1500
@@ -147,20 +166,54 @@ function AnalyticsPanel({
       {windowMessage && <p className="auth-message is-error analytics-window-message">{windowMessage}</p>}
 
       <div className="link-analytics-grid">
-        <section aria-label="Daily clicks">
-          <h2>Daily clicks</h2>
-          {analytics.daily.length === 0 ? (
-            <p className="empty-state">No clicks in this window.</p>
-          ) : (
-            <DailyClicksChart daily={analytics.daily} />
-          )}
-        </section>
+        <div className="analytics-main-column">
+          <section className="analytics-referrer-section" aria-label="Top referrers">
+            <h2>Top referrers</h2>
+            <TopReferrersPanel referrers={analytics.topReferrers} />
+          </section>
+
+          <section aria-label="Daily clicks">
+            <h2>Daily clicks</h2>
+            {analytics.daily.length === 0 ? (
+              <p className="empty-state">No clicks in this window.</p>
+            ) : (
+              <DailyClicksChart daily={analytics.daily} />
+            )}
+          </section>
+        </div>
 
         <section className="analytics-country-section" aria-label="Top countries">
           <h2>Top countries</h2>
           <TopCountriesPanel countries={analytics.topCountries} />
         </section>
       </div>
+    </div>
+  )
+}
+
+function TopReferrersPanel({ referrers }: { referrers: LinkAnalyticsResponse['topReferrers'] }) {
+  return (
+    <div className="referrer-list">
+      {referrers.map(referrer => {
+        const ReferrerIcon = referrerIcons[referrer.source]
+
+        return (
+          <article
+            className={`referrer-row referrer-row-${referrer.source}`}
+            key={referrer.source}
+            style={{ '--referrer-color': referrerColors[referrer.source] } as CSSProperties}
+          >
+            <span className="referrer-icon" aria-label={referrer.label}>
+              {referrer.source === 'instagram' || referrer.source === 'tiktok' ? (
+                <img src={referrer.source === 'instagram' ? instagramLogoUrl : tiktokLogoUrl} alt="" />
+              ) : ReferrerIcon ? (
+                <ReferrerIcon size={32} weight={['facebook', 'x'].includes(referrer.source) ? 'fill' : 'bold'} />
+              ) : null}
+            </span>
+            <strong>{referrer.clicks}</strong>
+          </article>
+        )
+      })}
     </div>
   )
 }
