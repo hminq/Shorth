@@ -1,10 +1,18 @@
 import http from 'k6/http'
 import { check, sleep } from 'k6'
+import { Counter } from 'k6/metrics'
 
 http.setResponseCallback(http.expectedStatuses({ min: 300, max: 399 }))
 
 const baseUrl = __ENV.BASE_URL ?? 'https://shorth.link'
 const slug = __ENV.SLUG
+const failedSamples = Number(__ENV.FAILED_SAMPLES ?? '10')
+const redirectStatuses = [301, 302, 303, 307, 308]
+
+const statusCounter = new Counter('redirect_status_code')
+const failedStatusCounter = new Counter('redirect_failed_status_code')
+
+let loggedFailedSamples = 0
 
 if (!slug) {
   throw new Error('SLUG is required. Example: k6 run -e SLUG=abc123 redirect-hot-path.js')
@@ -29,10 +37,28 @@ export default function () {
       endpoint: 'redirect-hot-path'
     }
   })
+  const hasLocationHeader = Boolean(response.headers.Location ?? response.headers.location)
+  const isRedirect = redirectStatuses.includes(response.status)
+
+  statusCounter.add(1, { status: String(response.status) })
+
+  if (!isRedirect || !hasLocationHeader) {
+    failedStatusCounter.add(1, {
+      status: String(response.status),
+      has_location: String(hasLocationHeader)
+    })
+
+    if (loggedFailedSamples < failedSamples) {
+      loggedFailedSamples += 1
+      console.log(
+        `FAIL status=${response.status} hasLocation=${hasLocationHeader} location=${response.headers.Location ?? response.headers.location ?? 'none'}`
+      )
+    }
+  }
 
   check(response, {
-    'returns redirect': r => [301, 302, 303, 307, 308].includes(r.status),
-    'has location header': r => Boolean(r.headers.Location ?? r.headers.location)
+    'returns redirect': () => isRedirect,
+    'has location header': () => hasLocationHeader
   })
 
   sleep(0.1)
