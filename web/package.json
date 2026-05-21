@@ -22,6 +22,7 @@
     "google-auth-library": "^10.6.2",
     "qrcode": "^1.5.4",
     "react": "^19.2.1",
-    "react-dom": "^19.2.1"
+    "react-dom": "^19.2.1",
+    "world-countries": "^5.1.0"
   }
 }

@@ -5,6 +5,7 @@ import {
   TwitterLogo,
   type Icon
 } from '@phosphor-icons/react'
+import type { Countries } from 'world-countries'
 import { fetchLinkAnalytics, type LinkAnalyticsResponse } from '../lib/api'
 import instagramLogoUrl from '../assets/instagram-logo.svg'
 import tiktokLogoUrl from '../assets/tiktok-logo.svg'
@@ -31,20 +32,9 @@ type GlobeRotation = {
   lng: number
 }
 
-const countryCoordinates: Record<string, { lat: number; lng: number }> = {
-  AU: { lat: -25.27, lng: 133.78 },
-  BR: { lat: -14.24, lng: -51.93 },
-  CA: { lat: 56.13, lng: -106.35 },
-  DE: { lat: 51.17, lng: 10.45 },
-  FR: { lat: 46.23, lng: 2.21 },
-  GB: { lat: 55.38, lng: -3.44 },
-  IN: { lat: 20.59, lng: 78.96 },
-  JP: { lat: 36.2, lng: 138.25 },
-  KR: { lat: 35.91, lng: 127.77 },
-  SG: { lat: 1.35, lng: 103.82 },
-  US: { lat: 37.09, lng: -95.71 },
-  VN: { lat: 14.06, lng: 108.28 }
-}
+type CountryCoordinateMap = Map<string, { lat: number; lng: number }>
+
+let countryCoordinatesPromise: Promise<CountryCoordinateMap> | null = null
 
 const countryColors = [
   { rgb: [0.96, 0.31, 0] as [number, number, number], css: '#f54e00' },
@@ -356,9 +346,24 @@ function getChartTooltipPosition(
 
 function TopCountriesPanel({ countries }: { countries: LinkAnalyticsResponse['topCountries'] }) {
   const [rotation, setRotation] = useState<GlobeRotation>({ lat: 8, lng: 105 })
+  const [countryCoordinates, setCountryCoordinates] = useState<CountryCoordinateMap | null>(null)
+
+  useEffect(() => {
+    let isMounted = true
+
+    void getCountryCoordinates().then(coordinates => {
+      if (isMounted) {
+        setCountryCoordinates(coordinates)
+      }
+    })
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   const focusCountry = (countryCode: string) => {
-    const coordinates = countryCoordinates[countryCode.toUpperCase()]
+    const coordinates = countryCoordinates?.get(countryCode.toUpperCase())
 
     if (!coordinates) {
       return
@@ -372,7 +377,12 @@ function TopCountriesPanel({ countries }: { countries: LinkAnalyticsResponse['to
 
   return (
     <div className="analytics-country-panel">
-      <CountryGlobe countries={countries} rotation={rotation} onRotationChange={setRotation} />
+      <CountryGlobe
+        countries={countries}
+        countryCoordinates={countryCoordinates}
+        rotation={rotation}
+        onRotationChange={setRotation}
+      />
       {countries.length === 0 ? (
         <p className="empty-state">No country data yet.</p>
       ) : (
@@ -403,10 +413,12 @@ function TopCountriesPanel({ countries }: { countries: LinkAnalyticsResponse['to
 
 function CountryGlobe({
   countries,
+  countryCoordinates,
   rotation,
   onRotationChange
 }: {
   countries: LinkAnalyticsResponse['topCountries']
+  countryCoordinates: CountryCoordinateMap | null
   rotation: GlobeRotation
   onRotationChange: (rotation: GlobeRotation) => void
 }) {
@@ -415,7 +427,7 @@ function CountryGlobe({
   const dragStartRef = useRef<{ x: number; y: number; rotation: GlobeRotation } | null>(null)
   const markers = useMemo(() => countries
     .map((country, index) => {
-      const coordinates = countryCoordinates[country.countryCode.toUpperCase()]
+      const coordinates = countryCoordinates?.get(country.countryCode.toUpperCase())
 
       if (!coordinates) {
         return null
@@ -423,11 +435,11 @@ function CountryGlobe({
 
       return {
         location: [coordinates.lat, coordinates.lng] as [number, number],
-        size: 0.035 + Math.min(country.percent, 100) / 1300,
+        size: 0.055 + Math.min(country.percent, 100) / 5000,
         color: countryColors[index % countryColors.length].rgb
       }
     })
-    .filter(marker => marker !== null), [countries])
+    .filter(marker => marker !== null), [countries, countryCoordinates])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -538,6 +550,23 @@ function normalizeLng(value: number) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
+}
+
+function getCountryCoordinates() {
+  countryCoordinatesPromise ??= import('world-countries').then(module => {
+    const countryCoordinates: CountryCoordinateMap = new Map(
+      (module.default as Countries).map(country => [
+        country.cca2.toUpperCase(),
+        { lat: country.latlng[0], lng: country.latlng[1] }
+      ])
+    )
+
+    countryCoordinates.set('XK', { lat: 42.6, lng: 20.9 })
+
+    return countryCoordinates
+  })
+
+  return countryCoordinatesPromise
 }
 
 function getLinkIdFromPath() {
