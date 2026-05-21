@@ -4,8 +4,8 @@
 # AI agents context file
 AGENTS.md
 DESIGN.md
-contexts
 .codex
+.antigravitycli
 
 # Local Api test file
 api-test
