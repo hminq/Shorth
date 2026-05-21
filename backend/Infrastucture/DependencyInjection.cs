@@ -140,6 +140,7 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IUserIdentityRepository, UserIdentityRepository>();
         services.AddScoped<IUserOtpRepository, UserOtpRepository>();
+        services.AddScoped<IUserRefreshTokenRepository, UserRefreshTokenRepository>();
         services.AddScoped<ILocalRegistrationRepository, LocalRegistrationRepository>();
         services.AddScoped<IExternalIdentityRepository, ExternalIdentityRepository>();
         services.AddScoped<IOtpCodeGenerator, RandomOtpCodeGenerator>();
@@ -157,6 +158,8 @@ public static class DependencyInjection
         services.AddScoped<IOtpRequestRateLimiter, RedisOtpRequestRateLimiter>();
         services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+        services.AddScoped<IRefreshTokenGenerator, RefreshTokenGenerator>();
+        services.AddScoped<IRefreshTokenHasher, RefreshTokenHasher>();
         services.AddScoped<IOutboxRepository, OutboxRepository>();
 
         return services;

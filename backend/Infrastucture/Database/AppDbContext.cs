@@ -13,6 +13,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<User> Users => Set<User>();
     public DbSet<UserIdentity> UserIdentities => Set<UserIdentity>();
     public DbSet<UserOtp> UserOtps => Set<UserOtp>();
+    public DbSet<UserRefreshToken> UserRefreshTokens => Set<UserRefreshToken>();
     public DbSet<Link> Links => Set<Link>();
     public DbSet<LinkClickEvent> LinkClickEvents => Set<LinkClickEvent>();
     public DbSet<LinkDailyStat> LinkDailyStats => Set<LinkDailyStat>();
@@ -29,6 +30,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.ApplyConfiguration(new UserConfiguration());
         modelBuilder.ApplyConfiguration(new UserIdentityConfiguration());
         modelBuilder.ApplyConfiguration(new UserOtpConfiguration());
+        modelBuilder.ApplyConfiguration(new UserRefreshTokenConfiguration());
         modelBuilder.ApplyConfiguration(new LinkConfiguration());
         modelBuilder.ApplyConfiguration(new LinkClickEventConfiguration());
         modelBuilder.ApplyConfiguration(new LinkDailyStatConfiguration());
