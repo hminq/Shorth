@@ -13,7 +13,7 @@ export function Header() {
 
     async function syncProfile() {
       try {
-        const profile = await fetchMe()
+        const profile = await fetchMe({ auth: 'optional' })
         saveProfileSession(profile)
         setSession(profile)
       } catch {
@@ -26,7 +26,7 @@ export function Header() {
 
   useEffect(() => {
     function handleSessionUpdate(event: Event) {
-      setSession((event as CustomEvent<AuthSession>).detail)
+      setSession((event as CustomEvent<AuthSession | null>).detail)
     }
 
     window.addEventListener('shorth:auth-session-updated', handleSessionUpdate)

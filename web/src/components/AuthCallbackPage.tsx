@@ -21,7 +21,7 @@ export function AuthCallbackPage() {
     async function syncProfileAndRedirect() {
       try {
         saveProfileSession(await fetchMe())
-        window.location.replace('/')
+        window.location.replace(takeSafeReturnTo())
       } catch {
         setState({
           status: 'error',
@@ -64,4 +64,15 @@ export function AuthCallbackPage() {
       <Footer />
     </main>
   )
+}
+
+function takeSafeReturnTo() {
+  const returnTo = localStorage.getItem('shorth.auth.returnTo')
+  localStorage.removeItem('shorth.auth.returnTo')
+
+  if (!returnTo || !returnTo.startsWith('/') || returnTo.startsWith('//')) {
+    return '/'
+  }
+
+  return returnTo
 }

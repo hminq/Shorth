@@ -48,7 +48,7 @@ export function LoginPage() {
     try {
       await loginLocal(email, password)
       saveProfileSession(await fetchMe())
-      window.location.href = '/'
+      window.location.href = getSafeReturnTo()
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not sign in.'
       setState({
@@ -62,6 +62,7 @@ export function LoginPage() {
     setState({ status: 'loading', message: 'Opening Google sign in...' })
 
     try {
+      localStorage.setItem('shorth.auth.returnTo', getSafeReturnTo())
       window.location.href = await getGoogleLoginUrl()
     } catch (error) {
       setState({
@@ -155,6 +156,15 @@ export function LoginPage() {
       <Footer />
     </main>
   )
+}
+
+function getSafeReturnTo() {
+  const returnTo = new URLSearchParams(window.location.search).get('returnTo')
+  if (!returnTo || !returnTo.startsWith('/') || returnTo.startsWith('//')) {
+    return '/'
+  }
+
+  return returnTo
 }
 
 function GoogleLogo() {

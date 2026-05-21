@@ -141,6 +141,10 @@ type ProblemDetails = {
   status?: number
 }
 
+type FetchAuthMode = 'none' | 'optional' | 'required'
+
+let refreshPromise: Promise<boolean> | null = null
+
 export async function createAnonymousLink(
   destinationUrl: string,
   captchaToken?: string
@@ -152,13 +156,9 @@ export async function createAnonymousLink(
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ destinationUrl, captchaToken })
-  })
+  }, { auth: 'optional' })
 
   if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error('Email or password is incorrect.')
-    }
-
     throw new Error(await readProblemMessage(response))
   }
 
@@ -173,7 +173,7 @@ export async function loginLocal(email: string, password: string): Promise<Login
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ email, password })
-  })
+  }, { auth: 'none' })
 
   if (!response.ok) {
     throw new Error(await readProblemMessage(response, { useLoginUnauthorizedMessage: true }))
@@ -194,7 +194,7 @@ export async function registerLocal(
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ email, password, displayName })
-  })
+  }, { auth: 'none' })
 
   if (!response.ok) {
     throw new Error(await readProblemMessage(response))
@@ -211,7 +211,7 @@ export async function verifyEmailOtp(email: string, otpCode: string): Promise<Ve
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ email, otpCode })
-  })
+  }, { auth: 'none' })
 
   if (!response.ok) {
     throw new Error(await readProblemMessage(response))
@@ -228,7 +228,7 @@ export async function resendVerificationOtp(email: string): Promise<ResendVerifi
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ email })
-  })
+  }, { auth: 'none' })
 
   if (!response.ok) {
     throw new Error(await readProblemMessage(response))
@@ -245,7 +245,7 @@ export async function forgotPassword(email: string): Promise<ForgotPasswordRespo
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ email })
-  })
+  }, { auth: 'none' })
 
   if (!response.ok) {
     throw new Error(await readProblemMessage(response))
@@ -265,7 +265,7 @@ export async function verifyPasswordReset(
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ email, otpCode })
-  })
+  }, { auth: 'none' })
 
   if (!response.ok) {
     throw new Error(await readProblemMessage(response))
@@ -285,7 +285,7 @@ export async function completePasswordReset(
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ resetToken, newPassword })
-  })
+  }, { auth: 'none' })
 
   if (!response.ok) {
     throw new Error(await readProblemMessage(response))
@@ -297,7 +297,7 @@ export async function completePasswordReset(
 export async function getGoogleLoginUrl(): Promise<string> {
   const response = await safeFetch('/api/login/google', {
     credentials: 'include'
-  })
+  }, { auth: 'none' })
 
   if (!response.ok) {
     throw new Error(await readProblemMessage(response))
@@ -307,10 +307,10 @@ export async function getGoogleLoginUrl(): Promise<string> {
   return payload.authorizationUrl
 }
 
-export async function fetchMe(): Promise<AuthSession> {
+export async function fetchMe(options: { auth?: Extract<FetchAuthMode, 'optional' | 'required'> } = {}): Promise<AuthSession> {
   const response = await safeFetch('/api/profile', {
     credentials: 'include'
-  })
+  }, { auth: options.auth ?? 'required' })
 
   if (!response.ok) {
     throw new Error(await readProblemMessage(response))
@@ -327,7 +327,7 @@ export async function updateProfile(payload: UpdateProfilePayload): Promise<User
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(payload)
-  })
+  }, { auth: 'required' })
 
   if (!response.ok) {
     throw new Error(await readProblemMessage(response))
@@ -344,7 +344,7 @@ export async function createUpload(payload: CreateUploadPayload): Promise<Create
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(payload)
-  })
+  }, { auth: 'required' })
 
   if (!response.ok) {
     throw new Error(await readProblemMessage(response))
@@ -375,7 +375,7 @@ export async function uploadFileToS3(upload: CreateUploadResponse, file: File): 
 export async function fetchUserLinks(page = 1): Promise<UserLinksResponse> {
   const response = await safeFetch(`/api/links?page=${page}`, {
     credentials: 'include'
-  })
+  }, { auth: 'required' })
 
   if (!response.ok) {
     throw new Error(await readProblemMessage(response))
@@ -406,7 +406,7 @@ export async function fetchLinkAnalytics(
   const suffix = params.size > 0 ? `?${params.toString()}` : ''
   const response = await safeFetch(`/api/links/${encodeURIComponent(linkId)}/analytics${suffix}`, {
     credentials: 'include'
-  })
+  }, { auth: 'required' })
 
   if (!response.ok) {
     throw new Error(await readProblemMessage(response))
@@ -430,6 +430,11 @@ export function saveAuthSession(session: LoginResponse) {
 export function saveProfileSession(session: AuthSession) {
   localStorage.setItem('shorth.auth', JSON.stringify(session))
   window.dispatchEvent(new CustomEvent<AuthSession>('shorth:auth-session-updated', { detail: session }))
+}
+
+export function clearAuthSession() {
+  localStorage.removeItem('shorth.auth')
+  window.dispatchEvent(new CustomEvent<AuthSession | null>('shorth:auth-session-updated', { detail: null }))
 }
 
 export function getAuthSession(): AuthSession | null {
@@ -462,9 +467,9 @@ export async function logout() {
   const response = await safeFetch('/api/logout', {
     method: 'POST',
     credentials: 'include'
-  })
+  }, { auth: 'none' })
 
-  localStorage.removeItem('shorth.auth')
+  clearAuthSession()
 
   if (!response.ok) {
     throw new Error(await readProblemMessage(response))
@@ -514,10 +519,54 @@ async function readProblemMessage(
   return problem?.detail || problem?.title || 'Something went wrong. Please try again.'
 }
 
-async function safeFetch(path: string, init?: RequestInit) {
+async function safeFetch(
+  path: string,
+  init?: RequestInit,
+  options: { auth?: FetchAuthMode } = {}
+) {
   try {
-    return await fetch(`${API_BASE_URL}${path}`, init)
+    const response = await fetch(`${API_BASE_URL}${path}`, init)
+    const authMode = options.auth ?? 'optional'
+
+    if (response.status !== 401 || authMode === 'none') {
+      return response
+    }
+
+    if (await refreshAuthSession()) {
+      return await fetch(`${API_BASE_URL}${path}`, init)
+    }
+
+    if (authMode === 'required') {
+      clearAuthSession()
+      redirectToLogin()
+    }
+
+    return response
   } catch {
     throw new Error('Could not reach Shorth right now. Please check your connection and try again.')
   }
+}
+
+async function refreshAuthSession() {
+  refreshPromise ??= fetch(`${API_BASE_URL}/api/auth/refresh`, {
+    method: 'POST',
+    credentials: 'include'
+  })
+    .then(response => response.ok)
+    .catch(() => false)
+    .finally(() => {
+      refreshPromise = null
+    })
+
+  return await refreshPromise
+}
+
+function redirectToLogin() {
+  if (window.location.pathname === '/login') {
+    return
+  }
+
+  const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`
+  const suffix = returnTo === '/' ? '' : `?returnTo=${encodeURIComponent(returnTo)}`
+  window.location.href = `/login${suffix}`
 }
