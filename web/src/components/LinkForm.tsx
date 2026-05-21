@@ -255,6 +255,13 @@ export function LinkForm() {
     })
   }
 
+  function openLinkAnalytics(linkId: string) {
+    const analyticsPath = `/links/${encodeURIComponent(linkId)}/analytics`
+    window.location.href = isAuthenticated
+      ? analyticsPath
+      : `/login?returnTo=${encodeURIComponent(analyticsPath)}`
+  }
+
   return (
     <section className="shorten-area" aria-label="Create short link">
       <div className="shorten-card">
@@ -332,11 +339,20 @@ export function LinkForm() {
         )}
       </div>
 
-      {recentLinks.length > 0 && (
+      {(recentLinks.length > 0 || state.status === 'success') && (
         <>
-          <button className="scroll-cue" type="button" onClick={scrollToRecentLinks}>
-            See your recent links ↓
-          </button>
+          <div className="post-result-actions">
+            {recentLinks.length > 0 && (
+              <button className="scroll-cue" type="button" onClick={scrollToRecentLinks}>
+                See your recent links ↓
+              </button>
+            )}
+            {state.status === 'success' && (
+              <button className="scroll-cue scroll-cue-secondary" type="button" onClick={() => openLinkAnalytics(state.link.id)}>
+                See link analytics ↗
+              </button>
+            )}
+          </div>
           <RecentLinks links={recentLinks} onCopy={copyLink} id="recent-links" />
         </>
       )}

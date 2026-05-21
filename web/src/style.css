@@ -1388,10 +1388,16 @@ h2 {
   background: var(--accent);
 }
 
+.post-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
 .scroll-cue {
   width: max-content;
   display: inline-flex;
-  margin-top: 28px;
   border: 2px solid var(--black);
   padding: 8px 12px;
   color: var(--accent);
@@ -1409,6 +1415,17 @@ h2 {
 .scroll-cue:focus-visible {
   color: var(--white);
   background: var(--secondary);
+}
+
+.scroll-cue-secondary {
+  color: var(--secondary);
+  border-color: var(--secondary);
+}
+
+.scroll-cue-secondary:hover,
+.scroll-cue-secondary:focus-visible {
+  color: var(--white);
+  background: var(--black);
 }
 
 .shorten-card {

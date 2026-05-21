@@ -164,11 +164,7 @@ function AnalyticsPanel({
 
           <section aria-label="Daily clicks">
             <h2>Daily clicks</h2>
-            {analytics.daily.length === 0 ? (
-              <p className="empty-state">No clicks in this window.</p>
-            ) : (
-              <DailyClicksChart daily={analytics.daily} />
-            )}
+            <DailyClicksChart daily={fillDailyClicksWindow(analytics.daily, windowRange)} />
           </section>
         </div>
 
@@ -651,6 +647,34 @@ function startOfLocalDay(value: Date) {
 function getDayDiff(from: Date, to: Date) {
   const millisecondsPerDay = 24 * 60 * 60 * 1000
   return Math.round((to.getTime() - from.getTime()) / millisecondsPerDay)
+}
+
+function fillDailyClicksWindow(
+  daily: LinkAnalyticsResponse['daily'],
+  windowRange: AnalyticsWindow
+) {
+  const fromDate = parseDateInput(windowRange.from)
+  const toDate = parseDateInput(windowRange.to)
+
+  if (!fromDate || !toDate || fromDate > toDate) {
+    return daily
+  }
+
+  const clicksByDate = new Map(daily.map(day => [day.date, day.clicks]))
+  const filledDaily: LinkAnalyticsResponse['daily'] = []
+  const cursor = new Date(fromDate)
+
+  while (cursor <= toDate) {
+    const date = formatDateInput(cursor)
+    filledDaily.push({
+      date,
+      clicks: clicksByDate.get(date) ?? 0,
+      uniqueVisitors: 0
+    })
+    cursor.setDate(cursor.getDate() + 1)
+  }
+
+  return filledDaily
 }
 
 function formatDate(value: string) {
