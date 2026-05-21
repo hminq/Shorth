@@ -1,5 +1,6 @@
 using Api.Exceptions;
 using Api.Configurations;
+using Application.Features.Auth.Configurations;
 using Infrastucture.Configurations;
 using Infrastucture;
 using Api.HealthChecks;
@@ -33,6 +34,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 builder.Services.AddInfrastructure(builder.Configuration);
 var authCookieOptions = ReadAuthCookieOptions(builder.Configuration, builder.Environment.IsProduction());
 builder.Services.AddSingleton(authCookieOptions);
+builder.Services.AddSingleton(new RefreshTokenOptions(authCookieOptions.RefreshTokenTtlDays));
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("WebClient", policy =>
@@ -132,11 +134,28 @@ static AuthCookieOptions ReadAuthCookieOptions(IConfiguration configuration, boo
         cookieName = "shorth_access_token";
     }
 
+    var refreshCookieName = configuration["AUTH_REFRESH_COOKIE_NAME"];
+    if (string.IsNullOrWhiteSpace(refreshCookieName))
+    {
+        refreshCookieName = "shorth_refresh_token";
+    }
+
     var accessTokenTtl = configuration["JWT_ACCESS_TOKEN_TTL_MINUTES"];
     if (!int.TryParse(accessTokenTtl, out var accessTokenTtlMinutes) || accessTokenTtlMinutes <= 0)
     {
         throw new InvalidOperationException("JWT access token ttl minutes must be a valid positive integer.");
     }
 
-    return new AuthCookieOptions(cookieName, webBaseUrl.TrimEnd('/'), accessTokenTtlMinutes);
+    var refreshTokenTtl = configuration["REFRESH_TOKEN_TTL_DAYS"];
+    if (!int.TryParse(refreshTokenTtl, out var refreshTokenTtlDays) || refreshTokenTtlDays <= 0)
+    {
+        throw new InvalidOperationException("Refresh token ttl days must be a valid positive integer.");
+    }
+
+    return new AuthCookieOptions(
+        cookieName,
+        refreshCookieName,
+        webBaseUrl.TrimEnd('/'),
+        accessTokenTtlMinutes,
+        refreshTokenTtlDays);
 }

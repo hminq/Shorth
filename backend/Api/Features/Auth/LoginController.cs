@@ -34,7 +34,7 @@ namespace Api.Features.Auth
             var serviceRequest = ToServiceRequest(request);
 
             var loginResult = await _authService.LocalLoginAsync(serviceRequest, ct);
-            SetAccessTokenCookie(loginResult.AccessToken);
+            SetAuthCookies(loginResult);
             var response = ToHttpResponse(loginResult);
 
             return Ok(response);
@@ -61,7 +61,7 @@ namespace Api.Features.Auth
                 var loginResult = await _authService.GoogleLoginAsync(
                     new GoogleLoginRequest(code, state),
                     ct);
-                SetAccessTokenCookie(loginResult.AccessToken);
+                SetAuthCookies(loginResult);
 
                 return Redirect($"{_authCookieOptions.WebBaseUrl}/auth/callback");
             }
@@ -79,18 +79,22 @@ namespace Api.Features.Auth
             }
         }
 
-        [HttpPost("~/api/logout")]
-        public IActionResult Logout()
+        [HttpPost("~/api/auth/refresh")]
+        public async Task<IActionResult> Refresh(CancellationToken ct)
         {
-            Response.Cookies.Delete(
-                _authCookieOptions.CookieName,
-                new CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = _environment.IsProduction(),
-                    SameSite = _environment.IsProduction() ? SameSiteMode.None : SameSiteMode.Lax,
-                    Path = "/"
-                });
+            Request.Cookies.TryGetValue(_authCookieOptions.RefreshCookieName, out var refreshToken);
+            var loginResult = await _authService.RefreshAsync(refreshToken, ct);
+            SetAuthCookies(loginResult);
+
+            return NoContent();
+        }
+
+        [HttpPost("~/api/logout")]
+        public async Task<IActionResult> Logout(CancellationToken ct)
+        {
+            Request.Cookies.TryGetValue(_authCookieOptions.RefreshCookieName, out var refreshToken);
+            await _authService.LogoutAsync(refreshToken, ct);
+            ClearAuthCookies();
 
             return NoContent();
         }
@@ -110,18 +114,49 @@ namespace Api.Features.Auth
             );
         }
 
-        private void SetAccessTokenCookie(string accessToken)
+        private void SetAuthCookies(LoginResult loginResult)
+        {
+            SetCookie(
+                _authCookieOptions.CookieName,
+                loginResult.AccessToken,
+                DateTimeOffset.UtcNow.AddMinutes(_authCookieOptions.AccessTokenTtlMinutes));
+            SetCookie(
+                _authCookieOptions.RefreshCookieName,
+                loginResult.RefreshToken,
+                DateTimeOffset.UtcNow.AddDays(_authCookieOptions.RefreshTokenTtlDays));
+        }
+
+        private void SetCookie(string name, string value, DateTimeOffset expires)
         {
             Response.Cookies.Append(
-                _authCookieOptions.CookieName,
-                accessToken,
+                name,
+                value,
                 new CookieOptions
                 {
                     HttpOnly = true,
                     Secure = _environment.IsProduction(),
                     SameSite = _environment.IsProduction() ? SameSiteMode.None : SameSiteMode.Lax,
                     Path = "/",
-                    Expires = DateTimeOffset.UtcNow.AddMinutes(_authCookieOptions.AccessTokenTtlMinutes)
+                    Expires = expires
+                });
+        }
+
+        private void ClearAuthCookies()
+        {
+            ClearCookie(_authCookieOptions.CookieName);
+            ClearCookie(_authCookieOptions.RefreshCookieName);
+        }
+
+        private void ClearCookie(string name)
+        {
+            Response.Cookies.Delete(
+                name,
+                new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = _environment.IsProduction(),
+                    SameSite = _environment.IsProduction() ? SameSiteMode.None : SameSiteMode.Lax,
+                    Path = "/"
                 });
         }
 
