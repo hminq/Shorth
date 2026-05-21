@@ -7,6 +7,7 @@ using Application.Features.Auth.Services;
 using Application.Features.Links.Services;
 using Application.Features.Profile.Services;
 using Application.Features.Upload.Services;
+using Infrastucture.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -84,6 +85,7 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<LinkService>();
 builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<UploadService>();
+builder.Services.AddHostedService<SqsClickEventPublisher>();
 
 var app = builder.Build();
 
