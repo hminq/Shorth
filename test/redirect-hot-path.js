@@ -8,6 +8,12 @@ const baseUrl = __ENV.BASE_URL ?? 'https://shorth.link'
 const slug = __ENV.SLUG
 const failedSamples = Number(__ENV.FAILED_SAMPLES ?? '10')
 const redirectStatuses = [301, 302, 303, 307, 308]
+const referrers = [
+  { source: 'facebook', value: 'https://www.facebook.com/' },
+  { source: 'instagram', value: 'https://www.instagram.com/' },
+  { source: 'x', value: 'https://x.com/' },
+  { source: 'tiktok', value: 'https://www.tiktok.com/' }
+]
 
 const statusCounter = new Counter('redirect_status_code')
 const failedStatusCounter = new Counter('redirect_failed_status_code')
@@ -32,9 +38,14 @@ export const options = {
 }
 
 export default function () {
+  const referrer = referrers[Math.floor(Math.random() * referrers.length)]
   const response = http.get(`${baseUrl}/${slug}`, {
+    headers: {
+      Referer: referrer.value
+    },
     tags: {
-      endpoint: 'redirect-hot-path'
+      endpoint: 'redirect-hot-path',
+      referrer_source: referrer.source
     }
   })
   const hasLocationHeader = Boolean(response.headers.Location ?? response.headers.location)
