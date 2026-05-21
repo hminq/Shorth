@@ -1,3 +1,4 @@
+using Application.Features.Auth.Configurations;
 using Application.Features.Auth.Dtos;
 using Application.Features.Auth.Interfaces;
 using Application.Features.Auth.Messages;
@@ -19,48 +20,60 @@ public sealed class AuthService
     private readonly IUserRepository _userRepository;
     private readonly IUserIdentityRepository _userIdentityRepository;
     private readonly IUserOtpRepository _userOtpRepository;
+    private readonly IUserRefreshTokenRepository _userRefreshTokenRepository;
     private readonly ILocalRegistrationRepository _localRegistrationRepository;
     private readonly IExternalIdentityRepository _externalIdentityRepository;
     private readonly IEmailJobQueue _emailJobQueue;
     private readonly IOtpCodeGenerator _otpCodeGenerator;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
+    private readonly IRefreshTokenGenerator _refreshTokenGenerator;
+    private readonly IRefreshTokenHasher _refreshTokenHasher;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IGoogleAuthProvider _googleAuthProvider;
     private readonly IGoogleAuthStateRepository _googleAuthStateStore;
     private readonly IAuthLinkBuilder _authLinkBuilder;
     private readonly IPasswordResetTokenRepository _passwordResetTokenRepository;
     private readonly IOtpRequestRateLimiter _otpRequestRateLimiter;
+    private readonly RefreshTokenOptions _refreshTokenOptions;
 
     public AuthService(
         IUserRepository userRepository,
         IUserIdentityRepository userIdentityRepository,
         IUserOtpRepository userOtpRepository,
+        IUserRefreshTokenRepository userRefreshTokenRepository,
         ILocalRegistrationRepository localRegistrationRepository,
         IExternalIdentityRepository externalIdentityRepository,
         IEmailJobQueue emailJobQueue,
         IOtpCodeGenerator otpCodeGenerator,
         IJwtTokenGenerator jwtTokenGenerator,
+        IRefreshTokenGenerator refreshTokenGenerator,
+        IRefreshTokenHasher refreshTokenHasher,
         IPasswordHasher passwordHasher,
         IGoogleAuthProvider googleAuthProvider,
         IGoogleAuthStateRepository googleAuthStateStore,
         IAuthLinkBuilder authLinkBuilder,
         IPasswordResetTokenRepository passwordResetTokenRepository,
-        IOtpRequestRateLimiter otpRequestRateLimiter)
+        IOtpRequestRateLimiter otpRequestRateLimiter,
+        RefreshTokenOptions refreshTokenOptions)
     {
         _userRepository = userRepository;
         _userIdentityRepository = userIdentityRepository;
         _userOtpRepository = userOtpRepository;
+        _userRefreshTokenRepository = userRefreshTokenRepository;
         _localRegistrationRepository = localRegistrationRepository;
         _externalIdentityRepository = externalIdentityRepository;
         _emailJobQueue = emailJobQueue;
         _otpCodeGenerator = otpCodeGenerator;
         _jwtTokenGenerator = jwtTokenGenerator;
+        _refreshTokenGenerator = refreshTokenGenerator;
+        _refreshTokenHasher = refreshTokenHasher;
         _passwordHasher = passwordHasher;
         _googleAuthProvider = googleAuthProvider;
         _googleAuthStateStore = googleAuthStateStore;
         _authLinkBuilder = authLinkBuilder;
         _passwordResetTokenRepository = passwordResetTokenRepository;
         _otpRequestRateLimiter = otpRequestRateLimiter;
+        _refreshTokenOptions = refreshTokenOptions;
     }
 
     public async Task<GoogleLoginUrlResult> GenerateGoogleLoginUrlAsync(CancellationToken ct = default)
@@ -147,7 +160,7 @@ public sealed class AuthService
 
             await _externalIdentityRepository.LinkAsync(existingUser, linkedGoogleIdentity, ct);
 
-            return CreateLoginResult(existingUser);
+            return await CreateLoginResultAsync(existingUser, now, ct);
         }
 
         var newUser = User.CreateOAuth(
@@ -169,7 +182,7 @@ public sealed class AuthService
 
         await _externalIdentityRepository.CreateAsync(newUser, newGoogleIdentity, ct);
 
-        return CreateLoginResult(newUser);
+        return await CreateLoginResultAsync(newUser, now, ct);
     }
 
     public async Task<LoginResult> LocalLoginAsync(LocalLoginRequest request, CancellationToken ct = default)
@@ -237,9 +250,71 @@ public sealed class AuthService
         foundUser.MarkLastLogin(DateTime.UtcNow);
         await _userRepository.UpdateAsync(foundUser, ct);
 
-        var accessToken = _jwtTokenGenerator.GenerateToken(foundUser);
+        return await CreateLoginResultAsync(foundUser, DateTime.UtcNow, ct);
+    }
 
-        return CreateLoginResult(foundUser, accessToken);
+    public async Task<LoginResult> RefreshAsync(string? refreshToken, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(refreshToken))
+        {
+            throw new UnauthorizedAccessException("Refresh token is missing.");
+        }
+
+        var now = DateTime.UtcNow;
+        var tokenHash = _refreshTokenHasher.Hash(refreshToken);
+        var foundRefreshToken = await _userRefreshTokenRepository.GetByTokenHashAsync(tokenHash, ct);
+        if (foundRefreshToken is null)
+        {
+            throw new UnauthorizedAccessException("Refresh token is invalid.");
+        }
+
+        if (foundRefreshToken.IsRevoked())
+        {
+            await _userRefreshTokenRepository.RevokeActiveByUserIdAsync(foundRefreshToken.UserId, now, ct);
+            throw new UnauthorizedAccessException("Refresh token has been reused.");
+        }
+
+        if (foundRefreshToken.IsExpired(now))
+        {
+            throw new UnauthorizedAccessException("Refresh token is expired.");
+        }
+
+        var foundUser = await _userRepository.GetByIdAsync(foundRefreshToken.UserId, ct);
+        if (foundUser is null)
+        {
+            throw new UnauthorizedAccessException("Refresh token is invalid.");
+        }
+
+        if (foundUser.Status == UserStatus.Disabled)
+        {
+            await _userRefreshTokenRepository.RevokeActiveByUserIdAsync(foundUser.Id, now, ct);
+            throw new AccountDisableException("This account is disabled.");
+        }
+
+        var replacementRefreshToken = CreateRefreshToken(foundUser.Id, now);
+        foundRefreshToken.Replace(replacementRefreshToken.Token.Id, now);
+
+        await _userRefreshTokenRepository.RotateAsync(foundRefreshToken, replacementRefreshToken.Token, ct);
+
+        return CreateLoginResult(foundUser, replacementRefreshToken.PlainText);
+    }
+
+    public async Task LogoutAsync(string? refreshToken, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(refreshToken))
+        {
+            return;
+        }
+
+        var tokenHash = _refreshTokenHasher.Hash(refreshToken);
+        var foundRefreshToken = await _userRefreshTokenRepository.GetByTokenHashAsync(tokenHash, ct);
+        if (foundRefreshToken is null || foundRefreshToken.IsRevoked())
+        {
+            return;
+        }
+
+        foundRefreshToken.Revoke(DateTime.UtcNow);
+        await _userRefreshTokenRepository.RevokeAsync(foundRefreshToken, ct);
     }
 
     public async Task<RegisterResult> LocalRegisterAsync(LocalRegisterRequest request, CancellationToken ct = default)
@@ -760,20 +835,39 @@ public sealed class AuthService
         user.MarkLastLogin(signedInAt);
         await _userRepository.UpdateAsync(user, ct);
 
-        return CreateLoginResult(user);
+        return await CreateLoginResultAsync(user, signedInAt, ct);
     }
 
-    private LoginResult CreateLoginResult(User user)
+    private async Task<LoginResult> CreateLoginResultAsync(User user, DateTime issuedAt, CancellationToken ct)
     {
-        return CreateLoginResult(user, _jwtTokenGenerator.GenerateToken(user));
+        var refreshToken = CreateRefreshToken(user.Id, issuedAt);
+        await _userRefreshTokenRepository.AddAsync(refreshToken.Token, ct);
+
+        return CreateLoginResult(user, refreshToken.PlainText);
     }
 
-    private static LoginResult CreateLoginResult(User user, string accessToken)
+    private LoginResult CreateLoginResult(User user, string refreshToken)
     {
         return new LoginResult(
-            accessToken,
+            _jwtTokenGenerator.GenerateToken(user),
+            refreshToken,
             user.Id,
             user.Email ?? string.Empty,
             user.DisplayName ?? string.Empty);
     }
+
+    private RefreshTokenIssue CreateRefreshToken(Guid userId, DateTime issuedAt)
+    {
+        var plainTextToken = _refreshTokenGenerator.GenerateToken();
+        var tokenHash = _refreshTokenHasher.Hash(plainTextToken);
+        var token = UserRefreshToken.Create(
+            userId,
+            tokenHash,
+            issuedAt,
+            issuedAt.AddDays(_refreshTokenOptions.TtlDays));
+
+        return new RefreshTokenIssue(plainTextToken, token);
+    }
+
+    private sealed record RefreshTokenIssue(string PlainText, UserRefreshToken Token);
 }
