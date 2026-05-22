@@ -61,3 +61,4 @@ nunit-*.xml
 
 docker-compose.prod.yml
 nginx.conf
+nginx.load-test.conf
