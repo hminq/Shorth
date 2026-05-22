@@ -1,7 +1,15 @@
 import QRCode from 'qrcode'
 import { ArrowSquareOut, Copy, DownloadSimple } from '@phosphor-icons/react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { createAnonymousLink, getAuthSession, shortUrl } from '../lib/api'
+import {
+  clearAuthSession,
+  createAnonymousLink,
+  fetchMe,
+  getAuthSession,
+  saveProfileSession,
+  shortUrl,
+  type AuthSession
+} from '../lib/api'
 import { Button } from './Button'
 
 const RECENT_LINKS_KEY = 'shorth.recentAnonymousLinks'
@@ -48,11 +56,70 @@ export function LinkForm() {
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [captchaReady, setCaptchaReady] = useState(false)
   const [showCaptchaHelper, setShowCaptchaHelper] = useState(true)
+  const [authSession, setAuthSession] = useState<AuthSession | null>(null)
+  const [isAuthChecking, setIsAuthChecking] = useState(() => getAuthSession() !== null)
   const qrCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const resultRef = useRef<HTMLDivElement | null>(null)
   const turnstileRef = useRef<HTMLDivElement | null>(null)
   const turnstileWidgetIdRef = useRef<string | null>(null)
-  const isAuthenticated = getAuthSession() !== null
+  const isAuthenticated = authSession !== null
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function verifyCachedSession() {
+      if (!getAuthSession()) {
+        setIsAuthChecking(false)
+        return
+      }
+
+      try {
+        const profile = await fetchMe({ auth: 'optional' })
+        if (!isMounted) {
+          return
+        }
+
+        saveProfileSession(profile)
+        setAuthSession(profile)
+      } catch {
+        if (!isMounted) {
+          return
+        }
+
+        clearAuthSession()
+        setAuthSession(null)
+      } finally {
+        if (isMounted) {
+          setIsAuthChecking(false)
+        }
+      }
+    }
+
+    void verifyCachedSession()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    function handleSessionUpdate(event: Event) {
+      setAuthSession((event as CustomEvent<AuthSession | null>).detail)
+      setIsAuthChecking(false)
+    }
+
+    window.addEventListener('shorth:auth-session-updated', handleSessionUpdate)
+    return () => window.removeEventListener('shorth:auth-session-updated', handleSessionUpdate)
+  }, [])
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return
+    }
+
+    setCaptchaToken(null)
+    setCaptchaReady(false)
+    setShowCaptchaHelper(true)
+  }, [isAuthenticated])
 
   useEffect(() => {
     if (state.status !== 'success' || !qrCanvasRef.current) {
@@ -85,7 +152,7 @@ export function LinkForm() {
   }, [captchaReady])
 
   useEffect(() => {
-    if (isAuthenticated || !TurnstileSiteKey || !turnstileRef.current) {
+    if (isAuthChecking || isAuthenticated || !TurnstileSiteKey || !turnstileRef.current) {
       return
     }
 
@@ -136,7 +203,7 @@ export function LinkForm() {
         turnstileWidgetIdRef.current = null
       }
     }
-  }, [isAuthenticated, state.status])
+  }, [isAuthChecking, isAuthenticated, state.status])
 
   useEffect(() => {
     if (state.status !== 'success') {
@@ -168,6 +235,11 @@ export function LinkForm() {
 
     if (!destinationUrl) {
       setState({ status: 'error', message: 'Paste a URL first.' })
+      return
+    }
+
+    if (isAuthChecking) {
+      setState({ status: 'loading', message: 'Checking your session...' })
       return
     }
 
@@ -288,11 +360,11 @@ export function LinkForm() {
                 required
               />
             )}
-            <Button type="submit">
-              {state.status === 'success' ? 'Shorten another' : 'Shorten'}
+            <Button type="submit" disabled={isAuthChecking}>
+              {isAuthChecking ? 'Checking...' : state.status === 'success' ? 'Shorten another' : 'Shorten'}
             </Button>
           </div>
-          {!isAuthenticated && state.status !== 'success' && (
+          {!isAuthChecking && !isAuthenticated && state.status !== 'success' && (
             <div className={`turnstile-row ${captchaReady && !showCaptchaHelper ? 'is-complete' : ''}`}>
               {TurnstileSiteKey ? (
                 <>

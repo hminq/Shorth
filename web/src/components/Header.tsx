@@ -1,5 +1,5 @@
 import { Button } from './Button'
-import { fetchMe, getAuthSession, logout, saveProfileSession, type AuthSession } from '../lib/api'
+import { clearAuthSession, fetchMe, getAuthSession, logout, saveProfileSession, type AuthSession } from '../lib/api'
 import { useEffect, useState } from 'react'
 
 export function Header() {
@@ -7,22 +7,31 @@ export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   useEffect(() => {
-    if (session) {
-      return
-    }
-
+    let isMounted = true
     async function syncProfile() {
       try {
         const profile = await fetchMe({ auth: 'optional' })
+        if (!isMounted) {
+          return
+        }
+
         saveProfileSession(profile)
         setSession(profile)
       } catch {
+        if (!isMounted) {
+          return
+        }
+
+        clearAuthSession()
         setSession(null)
       }
     }
 
     void syncProfile()
-  }, [session])
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   useEffect(() => {
     function handleSessionUpdate(event: Event) {
