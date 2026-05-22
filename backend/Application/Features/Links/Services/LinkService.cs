@@ -205,22 +205,6 @@ public sealed class LinkService
             throw new ArgumentException($"Slug must be {SlugRules.SlugLength} characters long.", nameof(request));
         }
 
-        var cachedLink = await _linkCacheRepository.GetBySlugAsync(request.Slug, ct);
-
-        if (cachedLink != null)
-        {
-            await _clickEventQueue.EnqueueAsync(
-                cachedLink.LinkId,
-                DateTime.UtcNow,
-                request.UserAgent,
-                request.Referrer,
-                request.IpHash,
-                request.CountryCode,
-                ct);
-
-            return new ResolveLinkResult(cachedLink.DestinationUrl);
-        }
-
         var link = await _linkRepository.GetBySlugAsync(request.Slug, ct);
 
         if (link != null)
@@ -236,11 +220,6 @@ public sealed class LinkService
             }
 
             var clickedAt = DateTime.UtcNow;
-
-            await _linkCacheRepository.SetBySlugAsync(
-                link.Slug,
-                new LinkCacheEntry(link.Id, link.DestinationUrl),
-                ct);
 
             await _clickEventQueue.EnqueueAsync(
                 link.Id,

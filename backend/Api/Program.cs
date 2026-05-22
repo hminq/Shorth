@@ -87,7 +87,6 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<LinkService>();
 builder.Services.AddScoped<ProfileService>();
 builder.Services.AddScoped<UploadService>();
-builder.Services.AddHostedService<SqsClickEventPublisher>();
 
 var app = builder.Build();
 

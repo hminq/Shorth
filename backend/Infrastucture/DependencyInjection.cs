@@ -128,8 +128,7 @@ public static class DependencyInjection
                 provider.GetRequiredService<IDistributedCache>(),
                 TimeSpan.FromHours(provider.GetRequiredService<RedisOptions>().LinkDestinationUrlTtlHours)));
         services.AddScoped<ISlugGenerator, SlugGenerator>();
-        services.AddSingleton<ClickEventChannel>();
-        services.AddScoped<IClickEventQueue, ChannelClickEventQueue>();
+        services.AddScoped<IClickEventQueue, SqsClickEventQueue>();
         services.AddHttpClient<ICaptchaVerifier, CloudflareTurnstileVerifier>();
 
         return services;
