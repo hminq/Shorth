@@ -10,7 +10,10 @@ on:
 
 permissions:
   contents: read
-  id-token: write
+
+concurrency:
+  group: deploy-backend-production
+  cancel-in-progress: false
 
 jobs:
   deploy-backend:
@@ -20,15 +23,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
         with:
-          role-to-assume: ${{ secrets.AWS_BACKEND_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -39,7 +38,7 @@ jobs:
           context: backend
           file: backend/Api/Dockerfile
           push: true
-          tags: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_API_REPOSITORY }}:${{ github.sha }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKERHUB_API_REPO }}:${{ github.sha }}
 
       - name: Build and push Worker image
         uses: docker/build-push-action@v6
@@ -47,24 +46,21 @@ jobs:
           context: backend
           file: backend/Worker/Dockerfile
           push: true
-          tags: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_WORKER_REPOSITORY }}:${{ github.sha }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKERHUB_WORKER_REPO }}:${{ github.sha }}
 
-      - name: Setup SSH agent
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-
-      - name: Copy backend deploy script to EC2
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST_IP }} "mkdir -p ${{ secrets.DEPLOY_PATH }}/scripts"
-          scp -o StrictHostKeyChecking=no backend/scripts/deploy-backend.sh ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST_IP }}:${{ secrets.DEPLOY_PATH }}/scripts/deploy-backend.sh
-          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST_IP }} "chmod +x ${{ secrets.DEPLOY_PATH }}/scripts/deploy-backend.sh"
-
-      - name: Pull and restart backend services on EC2
+      - name: Deploy backend to VPS
+        uses: appleboy/ssh-action@v1.2.2
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          ssh -o StrictHostKeyChecking=no \
-            ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST_IP }} \
-            "DEPLOY_PATH='${{ secrets.DEPLOY_PATH }}' AWS_REGION='${{ secrets.AWS_REGION }}' AWS_SECRETS_MANAGER_SECRET_NAME='${{ secrets.AWS_SECRETS_MANAGER_SECRET_NAME }}' ECR_REGISTRY='${ECR_REGISTRY}' IMAGE_TAG='${IMAGE_TAG}' ECR_API_REPOSITORY='${{ secrets.ECR_API_REPOSITORY }}' ECR_WORKER_REPOSITORY='${{ secrets.ECR_WORKER_REPOSITORY }}' bash '${{ secrets.DEPLOY_PATH }}/scripts/deploy-backend.sh'"
+          DEPLOY_API_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKERHUB_API_REPO }}:${{ github.sha }}
+          DEPLOY_WORKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKERHUB_WORKER_REPO }}:${{ github.sha }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          envs: DEPLOY_API_IMAGE,DEPLOY_WORKER_IMAGE
+          script: |
+            set -e
+            cd /root/shorth
+            docker compose --env-file .env pull
+            docker compose --env-file .env up -d --remove-orphans
+            docker image prune -f
