@@ -1,5 +1,5 @@
 import http from 'k6/http'
-import { check, sleep } from 'k6'
+import { check } from 'k6'
 import { Counter } from 'k6/metrics'
 
 http.setResponseCallback(http.expectedStatuses({ min: 300, max: 399 }))
@@ -26,12 +26,21 @@ if (!slug) {
 
 export const options = {
   maxRedirects: 0,
-  stages: [
-    { duration: '20s', target: 100 },
-    { duration: '40s', target: 200 },
-    { duration: '40s', target: 400 },
-    { duration: '20s', target: 0 }
-  ],
+  scenarios: {
+    redirect_hot_path: {
+      executor: 'ramping-arrival-rate',
+      startRate: 50,
+      timeUnit: '1s',
+      preAllocatedVUs: 50,
+      maxVUs: 250,
+      stages: [
+        { duration: '20s', target: 100 },
+        { duration: '40s', target: 200 },
+        { duration: '40s', target: 200 },
+        { duration: '20s', target: 0 }
+      ]
+    }
+  },
   thresholds: {
     http_req_failed: ['rate<0.01'],
     http_req_duration: ['p(95)<200']
@@ -72,6 +81,4 @@ export default function () {
     'returns redirect': () => isRedirect,
     'has location header': () => hasLocationHeader
   })
-
-  sleep(0.1)
 }
