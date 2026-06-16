@@ -50,16 +50,22 @@ const benefits: Benefit[] = [
 export function Benefits() {
   return (
     <section id="features" className="benefits" aria-label="Shorth features">
-      {benefits.map(({ icon: BenefitIcon, title, body }, index) => (
-        <article className="benefit-card" key={title}>
-          <div className="benefit-kicker">
-            <span className="benefit-index">{String(index + 1).padStart(2, '0')}</span>
-            <BenefitIcon className="ph-icon" weight="bold" />
-          </div>
-          <h2>{title}</h2>
-          <p>{body}</p>
-        </article>
-      ))}
+      <div className="benefits-intro">
+        <span>Features</span>
+      </div>
+
+      <div className="benefit-list">
+        {benefits.map(({ icon: BenefitIcon, title, body }, index) => (
+          <article className="benefit-card" key={title}>
+            <div className="benefit-kicker">
+              <span className="benefit-index">{String(index + 1).padStart(2, '0')}</span>
+              <BenefitIcon className="ph-icon" weight="bold" />
+            </div>
+            <h2>{title}</h2>
+            <p>{body}</p>
+          </article>
+        ))}
+      </div>
     </section>
   )
 }

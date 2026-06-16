@@ -1,5 +1,5 @@
 import QRCode from 'qrcode'
-import { ArrowSquareOut, Copy, DownloadSimple } from '@phosphor-icons/react'
+import { ArrowDown, ArrowSquareOut, ArrowUpRight, Copy, DownloadSimple } from '@phosphor-icons/react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   clearAuthSession,
@@ -335,7 +335,7 @@ export function LinkForm() {
   }
 
   return (
-    <section className="shorten-area" aria-label="Create short link">
+    <section className="shorten-area home-link-form" aria-label="Create short link">
       <div className="shorten-card">
         <form className="shorten-form" onSubmit={handleSubmit}>
           <label className="field-label" htmlFor="destinationUrl">
@@ -416,12 +416,14 @@ export function LinkForm() {
           <div className="post-result-actions">
             {recentLinks.length > 0 && (
               <button className="scroll-cue" type="button" onClick={scrollToRecentLinks}>
-                See your recent links ↓
+                See your recent links
+                <ArrowDown size={15} weight="bold" aria-hidden="true" />
               </button>
             )}
             {state.status === 'success' && (
               <button className="scroll-cue scroll-cue-secondary" type="button" onClick={() => openLinkAnalytics(state.link.id)}>
-                See link analytics ↗
+                See link analytics
+                <ArrowUpRight size={15} weight="bold" aria-hidden="true" />
               </button>
             )}
           </div>
