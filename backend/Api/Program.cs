@@ -1,4 +1,3 @@
-using Api.Exceptions;
 using Api.Configurations;
 using Application.Features.Auth.Configurations;
 using Infrastucture.Configurations;
@@ -14,6 +13,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Api;
 
 var builder = WebApplication.CreateBuilder(args);
 await builder.Configuration.AddSecretsIfProductionAsync(builder.Environment.IsProduction());
@@ -32,7 +32,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.KnownProxies.Clear();
 });
 builder.Services.AddInfrastructure(builder.Configuration);
-var authCookieOptions = ReadAuthCookieOptions(builder.Configuration, builder.Environment.IsProduction());
+var authCookieOptions = ReadAuthCookieOptions(builder.Configuration);
 builder.Services.AddSingleton(authCookieOptions);
 builder.Services.AddSingleton(new RefreshTokenOptions(authCookieOptions.RefreshTokenTtlDays));
 builder.Services.AddCors(options =>
@@ -115,30 +115,11 @@ app.MapMethods("/ping", ["GET", "HEAD"], () =>
 
 app.Run();
 
-static AuthCookieOptions ReadAuthCookieOptions(IConfiguration configuration, bool isProduction)
+static AuthCookieOptions ReadAuthCookieOptions(IConfiguration configuration)
 {
-    var webBaseUrl = configuration["WEB_BASE_URL"];
-    if (string.IsNullOrWhiteSpace(webBaseUrl))
-    {
-        if (isProduction)
-        {
-            throw new InvalidOperationException("Web base url is not configured.");
-        }
-
-        webBaseUrl = "http://localhost:5173";
-    }
-
-    var cookieName = configuration["AUTH_COOKIE_NAME"];
-    if (string.IsNullOrWhiteSpace(cookieName))
-    {
-        cookieName = "shorth_access_token";
-    }
-
-    var refreshCookieName = configuration["AUTH_REFRESH_COOKIE_NAME"];
-    if (string.IsNullOrWhiteSpace(refreshCookieName))
-    {
-        refreshCookieName = "shorth_refresh_token";
-    }
+    var webBaseUrl = Required(configuration, "WEB_BASE_URL", "Web base url is not configured.");
+    var cookieName = Required(configuration, "AUTH_COOKIE_NAME", "Auth cookie name is not configured.");
+    var refreshCookieName = Required(configuration, "AUTH_REFRESH_COOKIE_NAME", "Auth refresh cookie name is not configured.");
 
     var accessTokenTtl = configuration["JWT_ACCESS_TOKEN_TTL_MINUTES"];
     if (!int.TryParse(accessTokenTtl, out var accessTokenTtlMinutes) || accessTokenTtlMinutes <= 0)
@@ -158,4 +139,18 @@ static AuthCookieOptions ReadAuthCookieOptions(IConfiguration configuration, boo
         webBaseUrl.TrimEnd('/'),
         accessTokenTtlMinutes,
         refreshTokenTtlDays);
+}
+
+static string Required(
+    IConfiguration configuration,
+    string key,
+    string errorMessage)
+{
+    var value = configuration[key];
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        throw new InvalidOperationException(errorMessage);
+    }
+
+    return value;
 }

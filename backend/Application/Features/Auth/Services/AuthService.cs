@@ -263,6 +263,7 @@ public sealed class AuthService
         var now = DateTime.UtcNow;
         var tokenHash = _refreshTokenHasher.Hash(refreshToken);
         var foundRefreshToken = await _userRefreshTokenRepository.GetByTokenHashAsync(tokenHash, ct);
+        
         if (foundRefreshToken is null)
         {
             throw new UnauthorizedAccessException("Refresh token is invalid.");

@@ -3,12 +3,14 @@ using Domain.Features.Auth.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Api.Exceptions;
+namespace Api;
 
 public sealed class GlobalExceptionHandler(
+    IProblemDetailsService problemDetailsService,
     ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
 {
     private readonly ILogger<GlobalExceptionHandler> _logger = logger;
+    private readonly IProblemDetailsService _problemDetailsService = problemDetailsService;
 
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext,
@@ -138,8 +140,12 @@ public sealed class GlobalExceptionHandler(
 
         httpContext.Response.StatusCode = problemDetails.Status ?? StatusCodes.Status500InternalServerError;
 
-        await httpContext.Response.WriteAsJsonAsync(problemDetails, ct);
-        return true;
+        return await _problemDetailsService.TryWriteAsync(new ProblemDetailsContext
+        {
+           HttpContext = httpContext,
+           ProblemDetails = problemDetails,
+           Exception = exception 
+        });
     }
 
     private static ProblemDetails CreateWrongCredentialsProblem(HttpContext httpContext)
